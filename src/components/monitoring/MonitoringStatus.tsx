@@ -1,0 +1,7 @@
+﻿import { Camera, CameraOff, Expand, ShieldCheck, ShieldAlert } from 'lucide-react'
+import type { CameraStatus, CompetitionSession, ConnectionStatus } from '../../types/monitoring'
+interface Props { camera: CameraStatus; fullscreen: boolean; session: CompetitionSession | null; connection: ConnectionStatus; locked: boolean }
+export function MonitoringStatus({ camera, fullscreen, session, connection, locked }: Props) {
+  const secure = !locked && connection === 'CONNECTED' && camera === 'ACTIVE' && fullscreen && !!session && ['ACTIVE','RESUME_AUTHORIZED'].includes(session.status)
+  return <div className="monitoring-status" aria-label="Competition monitoring status"><span className={camera === 'ACTIVE' ? 'monitor-good' : 'monitor-warn'} title={'Camera: ' + camera}>{camera === 'ACTIVE' ? <Camera size={12} /> : <CameraOff size={12} />}<span>Camera: {camera === 'ACTIVE' ? 'ACTIVE' : camera.replaceAll('_',' ')}</span></span><span className={fullscreen ? 'monitor-good' : 'monitor-warn'} title={fullscreen ? 'Fullscreen is active' : 'Fullscreen needs activation'}><Expand size={11} /><span>Fullscreen: {fullscreen ? 'ON' : 'OFF'}</span></span><span className={secure ? 'monitor-good' : locked ? 'monitor-bad' : 'monitor-warn'} title="Browser monitoring status; server session policy remains authoritative">{secure ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}<span>Session: {locked ? 'LOCKED' : connection !== 'CONNECTED' ? connection.replaceAll('_',' ') : session?.status === 'FINISHED' ? 'FINISHED' : secure ? 'SECURE' : 'SETUP'}</span></span></div>
+}

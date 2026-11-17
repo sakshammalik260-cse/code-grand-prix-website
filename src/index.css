@@ -1,9 +1,10 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 @import './styles/global.css';
 @import './styles/flow.css';
 @import './styles/responsive.css';
 @import './styles/racing-redesign.css';
 @import './styles/arena-foundation.css';
+@import './styles/monitoring.css';
 
 @theme {
   --color-racing-red: #e10600;

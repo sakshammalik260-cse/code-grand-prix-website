@@ -1,4 +1,5 @@
-﻿import type { MockScenario, SubmissionRequest, SubmissionResult } from '../../types/arena'
+import { assertMockMonitoringExecution } from '../monitoring/mock'
+import type { MockScenario, SubmissionRequest, SubmissionResult } from '../../types/arena'
 import { executionFixture, validateSource } from './execution'
 import { ArenaServiceError, assertLiveContest, delay, mockControls, updateMockProgress } from './mockState'
 
@@ -6,9 +7,10 @@ interface MockJob { request: SubmissionRequest; initial: SubmissionResult; start
 const jobs = new Map<string, MockJob>()
 export const submissionService = {
   async submitCode(request: SubmissionRequest, signal?: AbortSignal): Promise<SubmissionResult> {
-    validateSource(request); assertLiveContest(request.contestId)
+    validateSource(request); assertLiveContest(request.contestId); await assertMockMonitoringExecution(request, request.sessionId)
     const scenario = mockControls.submissionScenario
     await delay(350, signal)
+    await assertMockMonitoringExecution(request, request.sessionId)
     if (scenario === 'NETWORK_ERROR') throw new ArenaServiceError('The simulated submission could not be queued. Your code is unchanged. Please try again.')
     const initial: SubmissionResult = { id: `sub-${crypto.randomUUID()}`, contestId: request.contestId, driverId: request.driverId, problemId: request.problemId, language: request.language, status: 'QUEUED', submittedAt: new Date().toISOString(), simulation: true }
     jobs.set(initial.id, { request: { ...request }, initial, started: Date.now(), scenario })

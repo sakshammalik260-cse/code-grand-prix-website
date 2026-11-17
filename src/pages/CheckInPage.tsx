@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Camera, CameraOff, Check, Circle, Expand, LoaderCircle, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react'
 import { useCamera } from '../hooks/useCamera'
@@ -70,7 +70,7 @@ export function CheckInPage() {
           {camera.error && <p className="alert alert-error inspection-error" role="alert">{camera.error}</p>}
           {fullscreenError && <p className="alert alert-error inspection-error" role="alert">{fullscreenError}</p>}
           <label className="checkbox-label inspection-acknowledgment"><input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} /><span>I have read and agree to follow the competition rules of Code Grand Prix. <a href="/#rules" target="_blank" rel="noreferrer">Review guidelines</a></span></label>
-          <p className="inspection-privacy"><LockKeyhole size={12} /> Local preview only. Nothing is recorded or uploaded.<br /><span>The camera stops when you leave this page. Press Esc to exit fullscreen.</span></p>
+          <p className="inspection-privacy"><LockKeyhole size={12} /> Local preview only. Nothing is recorded or uploaded.<br /><span>Camera stays local through the lobby and arena. Sign out or leave the participant flow to stop it. Press Esc to exit fullscreen.</span></p>
         </div>
         <aside className="inspection-status-column readiness-panel">
           <section className="glass-panel system-status-panel" aria-label="System status"><h2>System Status</h2><ul>{inspectionSteps.map(step => <li key={step.status} className={step.done ? 'verified' : ''}>{step.done ? <Check className="status-verified-icon" size={16} strokeWidth={3} /> : <Circle size={16} />}<span>{step.status}</span><span className="sr-only">{step.done ? ', complete' : ', pending'}</span></li>)}</ul><div className="system-check-count">{checks.filter(check => check.done).length} OF 4 CHECKS COMPLETE <span>{ready ? 'READY' : 'PENDING'}</span></div></section>

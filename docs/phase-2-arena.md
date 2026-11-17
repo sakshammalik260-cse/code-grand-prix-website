@@ -1,3 +1,5 @@
+> Phase 3 supersedes the camera lifecycle and monitoring notes below: one local stream now spans check-in, lobby and arena. See [Phase 3](phase-3-monitoring.md).
+
 # Phase 2 — Coding Arena
 
 The existing protected arena route now implements the three-pane IDE from reference 05. Landing, login, inspection and lobby designs are preserved. References 06–08 remain later-phase work.

@@ -1,3 +1,4 @@
+import { assertMockMonitoringExecution } from '../monitoring/mock'
 import type { CodeExecutionRequest, CodeExecutionResult, Verdict } from '../../types/arena'
 import { ArenaServiceError, assertLiveContest, delay, findMockProblem, mockControls } from './mockState'
 
@@ -32,9 +33,10 @@ export function executionFixture(request: CodeExecutionRequest, status: Verdict)
 }
 export const executionService = {
   async runCode(request: CodeExecutionRequest, signal?: AbortSignal): Promise<CodeExecutionResult> {
-    validateSource(request); assertLiveContest(request.contestId)
+    validateSource(request); assertLiveContest(request.contestId); await assertMockMonitoringExecution(request, request.sessionId)
     const scenario = mockControls.runScenario
     await delay(850, signal)
+    await assertMockMonitoringExecution(request, request.sessionId)
     if (scenario === 'NETWORK_ERROR') throw new ArenaServiceError('The simulated execution request failed. Your draft was preserved. Retry when ready.')
     return executionFixture(request, scenario)
   },

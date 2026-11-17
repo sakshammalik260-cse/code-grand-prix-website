@@ -2,6 +2,14 @@
 
 Existing React + TypeScript + Vite frontend for CPC Club at Jain (Deemed-to-be) University. Event date: **November 23, 2026**.
 
+## Phase 3 - Session monitoring and volunteer review
+
+Active-arena monitoring now reports hidden tabs, separate window-focus signals, fullscreen exits and local camera interruptions. Race Control preserves the mounted editor, results and autosaved drafts while enforcing session policy. Confirmed service approval and restored monitoring setup are required to resume. The existing official clock continues during locks.
+
+The `/volunteer` route now provides an explicitly labeled mock review flow and an API role gate. Development-only simulation controls are omitted from production JavaScript. Camera access is shared across check-in, lobby and arena, then released on sign-out or leaving those routes.
+
+See [Phase 3 files, API contracts, verification and organizer recovery procedure](docs/phase-3-monitoring.md). The backend remains unimplemented; browser monitoring and mock persistence are not security enforcement.
+
 ## Phase 2 — Coding Arena
 
 The protected `/arena` route now implements the approved three-pane competitive programming IDE with CodeMirror 6, four public demo problems, Python/Java/C++/JavaScript templates, independent autosaved drafts, public sample/custom-input results, simulated Run/Submit services, race states/timer and service-driven demo progress. Desktop panes scroll independently; smaller screens use workspace tabs.
@@ -24,7 +32,7 @@ On Windows with PowerShell scripts disabled, use `npm.cmd` instead of `npm`. Cam
 
 ## Reference-matched visual redesign
 
-The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. Phase 2 implements reference 05; references 06–08 remain later-phase work.
+The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. Phase 2 implements reference 05; Phase 3 implements reference 06 and the volunteer dashboard from reference 07; reference 08 remains later-phase work.
 
 | Page | Visual changes |
 | --- | --- |
@@ -58,7 +66,7 @@ The complete generation prompts are recorded in `src/assets/artwork/README.md`. 
 - `src/assets/artwork/`, `src/assets/fonts/`: original artwork, local display font, provenance and license.
 - `README.md`: current setup, testing and handoff notes.
 
-The existing `App.tsx` route architecture, authentication context, service modules, check-in hook, data and TypeScript types are preserved. No dependencies were added. Arena, volunteer, results and 404 routes retain their existing behavior.
+The existing `App.tsx` route architecture, authentication context, service modules, check-in hook, data and TypeScript types are preserved. No dependencies were added. Existing authentication and participant routes are retained; the volunteer route now implements Phase 3 review.
 
 ## Pages and manual verification
 
@@ -69,7 +77,7 @@ The existing `App.tsx` route architecture, authentication context, service modul
 | `/check-in` | Confirm driver identity. Enable and allow the camera, then activate fullscreen. Accept the rules. All four required checks must pass before START YOUR ENGINE enables. Press Esc to confirm fullscreen readiness clears, then reactivate and proceed. |
 | `/lobby` | Confirm identity, check-in status, verification time and date countdown. Station remains “To be assigned” because no real assignment was provided. Use Waiting, Live race and Finished mock controls; follow the arena/results links. |
 | `/arena` | Complete check-in and select Live race in the mock lobby. Verify problems/languages, scoped autosave, refresh recovery, Run/Submit simulations, errors, timer states and progress. |
-| `/volunteer` | Confirm the existing operations skeleton. |
+| `/volunteer` | Enter the explicit mock volunteer preview. Search/review incidents and test KEEP LOCKED, ESCALATE and AUTHORIZE RESUME. |
 | `/results` | Confirm the existing results skeleton; no standings are fabricated. |
 | Unknown path | Verify 404 and return-to-grid link. |
 
@@ -84,7 +92,7 @@ The mock identity uses sessionStorage when available; no password is stored. Pha
 - Missing/busy/disconnected camera: verify the appropriate feedback and incomplete camera check.
 - Navigate away while camera permission is pending: a later-granted stream is immediately stopped.
 - Exit fullscreen: readiness clears. An unsupported or denied fullscreen request shows an error.
-- Leave check-in: media tracks stop. The lobby reports a completed local camera check, not an active feed.
+- Check-in to lobby to arena: the same local camera stream remains active. Leaving these routes or signing out stops all tracks. Restore camera explicitly after a full page reload.
 - Test keyboard access, visible focus, the skip link, reduced motion and mobile navigation.
 
 ## Validation
@@ -99,7 +107,7 @@ Browser checks cover empty/invalid login, password visibility, demo autofill/sig
 
 The API remains modular: replace `authService.login` with the real backend implementation and use the existing Axios client in `src/services/api.ts`. `VITE_API_BASE_URL` may configure the future endpoint. Never put secrets in frontend environment values.
 
-Authentication, role access, contest state, check-in validation, session security, scoring and results must be authoritative on the backend. Mock lobby controls remain explicitly labeled and do not start a real contest. The volunteer route contains no privileged operations.
+Authentication, role access, contest state, check-in validation, session security, scoring and results must be authoritative on the backend. Mock lobby controls remain explicitly labeled and do not start a real contest. The volunteer API must enforce privileged roles server-side. Mock volunteer access is explicitly labeled demo access.
 
 The countdown still targets the start of **November 23 at 00:00 IST**, matching the provided event date. Race start time is TBA and displayed separately. Lobby total hours includes remaining days. Final rules require CPC Club confirmation.
 

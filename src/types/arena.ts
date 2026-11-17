@@ -36,6 +36,7 @@ export type Verdict = 'ACCEPTED' | 'WRONG_ANSWER' | 'COMPILATION_ERROR' | 'RUNTI
 export type SubmissionStatus = 'QUEUED' | 'RUNNING' | Verdict
 export type MockScenario = Verdict | 'NETWORK_ERROR'
 export interface CodeExecutionRequest {
+  sessionId: string
   contestId: string
   driverId: string
   problemId: string
@@ -66,6 +67,7 @@ export interface CodeExecutionResult {
   simulation: boolean
 }
 export interface SubmissionRequest {
+  sessionId: string
   contestId: string
   driverId: string
   problemId: string

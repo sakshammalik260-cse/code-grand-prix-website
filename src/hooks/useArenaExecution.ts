@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { arenaServices } from '../services/arena'
 import { delay, errorMessage, isAbort } from '../services/arena/mockState'
 import type { CodeExecutionRequest, CodeExecutionResult, SubmissionRequest, SubmissionResult } from '../types/arena'
@@ -51,7 +51,7 @@ export function useArenaExecution({ request, allowed, onBusyChange, onProgress }
         let value = existing
         if (!value) {
           setSubmission(null); setSubmitting(true)
-          const payload: SubmissionRequest = { contestId: request.contestId, driverId: request.driverId, problemId: request.problemId, language: request.language, sourceCode: request.sourceCode }
+          const payload: SubmissionRequest = { sessionId: request.sessionId, contestId: request.contestId, driverId: request.driverId, problemId: request.problemId, language: request.language, sourceCode: request.sourceCode }
           value = await arenaServices.submitCode(payload, signal)
           if (signal.aborted) return
           setSubmitting(false); remember(value)

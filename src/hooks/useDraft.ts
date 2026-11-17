@@ -23,6 +23,8 @@ export function useDraft(scope: DraftScope, starter: string) {
   useEffect(() => {
     mounted.current = true
     const onHide = () => save(false)
+    const manualSave = () => save()
+    window.addEventListener('cgp-save-draft', manualSave)
     const onVisibility = () => { if (document.visibilityState === 'hidden') save(false) }
     window.addEventListener('pagehide', onHide)
     document.addEventListener('visibilitychange', onVisibility)
@@ -30,6 +32,7 @@ export function useDraft(scope: DraftScope, starter: string) {
       mounted.current = false
       if (timer.current) clearTimeout(timer.current)
       save(false)
+      window.removeEventListener('cgp-save-draft', manualSave)
       window.removeEventListener('pagehide', onHide)
       document.removeEventListener('visibilitychange', onVisibility)
     }

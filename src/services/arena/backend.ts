@@ -1,3 +1,4 @@
+import type { SessionEnvelope } from '../../types/monitoring'
 import { api } from '../api'
 import type { ArenaServiceContract, ArenaSession, CodeExecutionResult, ContestState, DriverProgress, Problem, ProblemSummary, SubmissionResult } from '../../types/arena'
 
@@ -10,6 +11,6 @@ export const backendArenaServices: ArenaServiceContract = {
   async runCode(request, signal) { return (await api.post<CodeExecutionResult>('/code/run', request, { signal })).data },
   async submitCode(request, signal) { return (await api.post<SubmissionResult>('/code/submit', request, { signal })).data },
   async getSubmission(id, signal) { return (await api.get<SubmissionResult>(`/submissions/${encodeURIComponent(id)}`, { signal })).data },
-  async getSession(_driverId, signal) { return (await api.get<ArenaSession>('/session', { signal })).data },
+  async getSession(driverId, signal) { const data = (await api.get<SessionEnvelope>('/session', { signal })).data; const result: ArenaSession = { driverId: data.session?.driverId || '', active: data.viewer.role === 'PARTICIPANT' && data.session?.driverId === driverId, simulation: data.viewer.simulation }; return result },
   async getProgress(contestId, _driverId, signal) { return (await api.get<DriverProgress>('/contest/progress', { params: { contestId }, signal })).data },
 }
