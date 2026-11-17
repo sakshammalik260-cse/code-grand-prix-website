@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { MotionConfig } from 'motion/react'
 import { SessionProvider } from './context/SessionProvider'
@@ -6,7 +7,9 @@ import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { CheckInPage } from './pages/CheckInPage'
 import { LobbyPage } from './pages/LobbyPage'
-import { ArenaPage, ResultsPage, VolunteerPage, NotFoundPage } from './pages/PlaceholderPages'
+import { ResultsPage, VolunteerPage, NotFoundPage } from './pages/PlaceholderPages'
+
+const ArenaPage = lazy(() => import('./pages/ArenaPage'))
 
 export default function App() {
   return <MotionConfig reducedMotion="user"><BrowserRouter><SessionProvider><Routes>
@@ -17,7 +20,7 @@ export default function App() {
         <Route path="check-in" element={<CheckInPage />} />
         <Route element={<RequireCheckIn />}>
           <Route path="lobby" element={<LobbyPage />} />
-          <Route path="arena" element={<ArenaPage />} />
+          <Route path="arena" element={<Suspense fallback={<div className="arena-load-screen" role="status">Loading coding arena...</div>}><ArenaPage /></Suspense>} />
         </Route>
       </Route>
       <Route path="volunteer" element={<VolunteerPage />} />

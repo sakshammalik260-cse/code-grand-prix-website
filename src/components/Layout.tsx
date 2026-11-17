@@ -22,6 +22,7 @@ export function Layout() {
   const open = menuPath === pathname
   const cinematic = ['/', '/login', '/check-in', '/lobby'].includes(pathname)
   const home = pathname === '/'
+  if (pathname === '/arena') return <div className="arena-route-shell"><ScrollToPage /><a className="skip-link" href="#arena-language">Skip to code editor</a><main id="main" tabIndex={-1}><Outlet /></main></div>
   return <div className={cinematic ? `app-shell cinematic-shell ${home ? 'home-shell' : 'entry-shell'} ${pathname === '/login' ? 'login-shell' : ''}` : 'app-shell'}>
     <ScrollToPage /><a className="skip-link" href="#main">Skip to content</a>
     <header className={`site-header ${cinematic ? 'race-header' : ''}`}><div className="nav-shell">

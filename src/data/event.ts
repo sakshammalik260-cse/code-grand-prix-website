@@ -1,4 +1,5 @@
 export const event = {
+  contestId: 'cgp-2026-round-01',
   name: 'Code Grand Prix 2026',
   organizer: 'CPC Club',
   university: 'Jain (Deemed-to-be) University',

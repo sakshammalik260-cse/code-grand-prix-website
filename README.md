@@ -1,6 +1,14 @@
-﻿# Code Grand Prix 2026
+# Code Grand Prix 2026
 
 Existing React + TypeScript + Vite frontend for CPC Club at Jain (Deemed-to-be) University. Event date: **November 23, 2026**.
+
+## Phase 2 — Coding Arena
+
+The protected `/arena` route now implements the approved three-pane competitive programming IDE with CodeMirror 6, four public demo problems, Python/Java/C++/JavaScript templates, independent autosaved drafts, public sample/custom-input results, simulated Run/Submit services, race states/timer and service-driven demo progress. Desktop panes scroll independently; smaller screens use workspace tabs.
+
+To enter: sign in, complete inspection, select **Live race** in the lobby mock controls, then **ENTER CODING ARENA**. Arena mock controls select verdicts, request failures and contest states. No source code is actually executed or judged.
+
+See [Phase 2 architecture, modified files, API contracts and testing](docs/phase-2-arena.md). `.env.example` documents `VITE_ARENA_MODE=mock` and `VITE_API_BASE_URL=/api`. No dependencies were added.
 
 ## Local development
 
@@ -16,7 +24,7 @@ On Windows with PowerShell scripts disabled, use `npm.cmd` instead of `npm`. Cam
 
 ## Reference-matched visual redesign
 
-The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. References 05–08 remain guidance for later development; their screens were not implemented or redesigned in this task.
+The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. Phase 2 implements reference 05; references 06–08 remain later-phase work.
 
 | Page | Visual changes |
 | --- | --- |
@@ -46,7 +54,7 @@ The complete generation prompts are recorded in `src/assets/artwork/README.md`. 
 - `src/components/Layout.tsx`: unobtrusive entry-screen navigation and context-aware header/footer; existing route guards retained.
 - `src/components/Countdown.tsx`: preserves the date countdown and adds an hours/minutes/seconds display for the lobby; days are included in the total hours.
 - `src/styles/racing-redesign.css`, `src/index.css`: scoped cinematic styling and responsive layouts. Other route styles remain in place.
-- `src/components/ArenaWorkspace.tsx`, `src/styles/arena-foundation.css`: reusable three-pane arena layout slots for the next phase, including a CodeMirror-compatible editor region. This foundation is not mounted on the Phase 1 placeholder route.
+- `src/components/ArenaWorkspace.tsx`, `src/styles/arena-foundation.css`: the Phase 2 arena now uses this three-pane layout with a resizable CodeMirror/results workspace.
 - `src/assets/artwork/`, `src/assets/fonts/`: original artwork, local display font, provenance and license.
 - `README.md`: current setup, testing and handoff notes.
 
@@ -60,7 +68,7 @@ The existing `App.tsx` route architecture, authentication context, service modul
 | `/login` | Submit empty fields and incorrect credentials; toggle password visibility. Expand **Preview access**, choose **Use demo credentials**, then select **ENTER THE GRID**. Verify loading and error feedback. |
 | `/check-in` | Confirm driver identity. Enable and allow the camera, then activate fullscreen. Accept the rules. All four required checks must pass before START YOUR ENGINE enables. Press Esc to confirm fullscreen readiness clears, then reactivate and proceed. |
 | `/lobby` | Confirm identity, check-in status, verification time and date countdown. Station remains “To be assigned” because no real assignment was provided. Use Waiting, Live race and Finished mock controls; follow the arena/results links. |
-| `/arena` | Complete check-in first. Confirm the existing Phase 1 skeleton and return-to-lobby link. |
+| `/arena` | Complete check-in and select Live race in the mock lobby. Verify problems/languages, scoped autosave, refresh recovery, Run/Submit simulations, errors, timer states and progress. |
 | `/volunteer` | Confirm the existing operations skeleton. |
 | `/results` | Confirm the existing results skeleton; no standings are fabricated. |
 | Unknown path | Verify 404 and return-to-grid link. |
@@ -68,7 +76,7 @@ The existing `App.tsx` route architecture, authentication context, service modul
 Demo Driver ID: `CGP2026`  
 Demo password: `Race2026!`
 
-The mock identity uses sessionStorage when available; no password is stored. Check-in remains in memory. Reloading a protected lobby/arena route requires fresh checks. Sign out clears the identity and check-in state.
+The mock identity uses sessionStorage when available; no password is stored. Phase 2 also retains a validated driver/contest mock check-in receipt for refresh recovery. Sign out clears both identity and receipt. The receipt does not indicate an active camera/fullscreen session, and backend security remains authoritative.
 
 ### Device and failure cases
 
@@ -95,7 +103,7 @@ Authentication, role access, contest state, check-in validation, session securit
 
 The countdown still targets the start of **November 23 at 00:00 IST**, matching the provided event date. Race start time is TBA and displayed separately. Lobby total hours includes remaining days. Final rules require CPC Club confirmation.
 
-Camera preview stays entirely local: no audio request, recording or upload. No hidden solutions/test cases, DevTools blocking, backend implementation or Monaco editor was added. CodeMirror 6 dependencies remain ready for the next phase.
+Camera preview stays entirely local: no audio request, recording or upload. No hidden solutions/test cases, DevTools blocking, backend implementation or Monaco editor was added. CodeMirror 6 now powers the Phase 2 arena.
 
 This is a local repository change. A future static deployment must rewrite BrowserRouter deep links to `index.html`.
 

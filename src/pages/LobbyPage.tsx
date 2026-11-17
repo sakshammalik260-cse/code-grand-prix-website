@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, CalendarDays, Check, ClipboardCheck, MapPin, Radio, UserRound } from 'lucide-react'
 import { Countdown } from '../components/Countdown'
@@ -6,11 +6,13 @@ import { Badge } from '../components/Ui'
 import { CircuitMap } from '../components/RacingIdentity'
 import { useSession } from '../hooks/useSession'
 import { event } from '../data/event'
-import type { ContestState } from '../types'
+import type { LobbyState } from '../types'
+import { isArenaMockMode } from '../services/arena'
+import { mockControls } from '../services/arena/mockState'
 
 export function LobbyPage() {
   const { driver, checkIn } = useSession()
-  const [state, setState] = useState<ContestState>('waiting')
+  const [state, setState] = useState<LobbyState>('waiting')
   return <section className={`cinematic-page cinematic-lobby lobby-state-${state}`}>
     <div className="lobby-content container">
       <div className="lobby-grid">
@@ -22,7 +24,7 @@ export function LobbyPage() {
         </section>
         <aside className="lobby-driver-column"><section className="glass-panel driver-details-panel"><h2>Driver Details</h2><dl><div><dt><UserRound size={17} />Driver ID</dt><dd>{driver?.id}</dd></div><div><dt><ClipboardCheck size={17} />Status</dt><dd><span className="checked-in-chip"><Check size={12} />Checked In</span></dd></div><div><dt><MapPin size={17} />Station</dt><dd className="station-pending">To be assigned</dd></div></dl><div className="driver-details-foot"><span>{driver?.name}</span><span>{checkIn ? new Date(checkIn.completedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: event.timezone }) : '—'} IST</span></div></section><div className="lobby-event-note"><CalendarDays size={15} /><div><strong>{event.dateLabel}</strong><span>{event.university}</span></div></div><p className="lobby-camera-note">Camera verified during check-in.<br />Your preview is now stopped.</p></aside>
       </div>
-      <section className="mock-controls lobby-mock-controls"><div><Badge tone="yellow">MOCK CONTEST</Badge><p>Preview only. These controls do not start a real contest.</p></div><div className="segmented-control" aria-label="Mock contest state">{(['waiting', 'live', 'finished'] as const).map(value => <button key={value} aria-pressed={state === value} onClick={() => setState(value)} className={state === value ? 'selected' : ''}>{value === 'waiting' ? 'Waiting' : value === 'live' ? 'Live race' : 'Finished'}</button>)}</div></section>
+      <section className="mock-controls lobby-mock-controls"><div><Badge tone="yellow">MOCK CONTEST</Badge><p>Preview only. These controls do not start a real contest.</p></div><div className="segmented-control" aria-label="Mock contest state">{(['waiting', 'live', 'finished'] as const).map(value => <button key={value} aria-pressed={state === value} onClick={() => { setState(value); if (isArenaMockMode) mockControls.setContestPhase(value === 'live' ? 'LIVE' : value === 'finished' ? 'FINISHED' : 'WAITING') }} className={state === value ? 'selected' : ''}>{value === 'waiting' ? 'Waiting' : value === 'live' ? 'Live race' : 'Finished'}</button>)}</div></section>
     </div>
     <p className="entry-page-caption">CODE GRAND PRIX 2026 <span>YOUR GRID. YOUR MOMENT.</span></p>
   </section>
