@@ -1,0 +1,17 @@
+﻿@import "tailwindcss";
+@import './styles/global.css';
+@import './styles/flow.css';
+@import './styles/responsive.css';
+@import './styles/racing-redesign.css';
+@import './styles/arena-foundation.css';
+
+@theme {
+  --color-racing-red: #e10600;
+  --color-carbon: #0b0b0f;
+  --color-surface: #17171d;
+  --color-race-white: #f5f5f5;
+  --color-success: #00d084;
+  --color-warning: #ffcc00;
+}
+
+

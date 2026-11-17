@@ -1,0 +1,101 @@
+﻿# Code Grand Prix 2026
+
+Existing React + TypeScript + Vite frontend for CPC Club at Jain (Deemed-to-be) University. Event date: **November 23, 2026**.
+
+## Local development
+
+```sh
+npm install
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
+
+On Windows with PowerShell scripts disabled, use `npm.cmd` instead of `npm`. Camera access requires localhost or HTTPS. Use a desktop browser with camera and Fullscreen API support for the entire participant flow.
+
+## Reference-matched visual redesign
+
+The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. References 05–08 remain guidance for later development; their screens were not implemented or redesigned in this task.
+
+| Page | Visual changes |
+| --- | --- |
+| Landing | Full-bleed original night-race artwork, realistic red car in the lower-left foreground, floodlights and light trails, large angular racing wordmark, checkered flag, floating countdown on the right and skewed red CTA. About and Rules remain below. |
+| Login | Original helmet portrait fills the left side. A compact wordmark, DRIVER LOGIN heading, two inputs and red CTA sit on the right. The former oversized copy and standard card are removed. Demo access is in an expandable section. |
+| Check-in | PRE-RACE INSPECTION heading; left checklist timeline, central real camera preview, and right System Status panel with START YOUR ENGINE underneath. All status indicators derive from the existing state. |
+| Lobby | Night-circuit backdrop, left circuit mini-map, centered title and countdown, translucent Driver Details card on the right, and compact mock-state controls below. |
+
+The branding uses a custom three-stripe speed mark and locally hosted **Goldman** typeface. No official F1/team logo is used. The artwork is separate from the actual semantic HTML, forms, buttons, timers and dashboard panels.
+
+### Artwork
+
+Original images were generated using the built-in imagegen tool and copied into the project as compressed WebP assets:
+
+- `src/assets/artwork/night-race-hero.webp` — red open-wheel race car at a floodlit night circuit, about 180 KB.
+- `src/assets/artwork/helmet-driver.webp` — black/red helmet portrait with red rim lighting, about 129 KB.
+- `src/assets/artwork/night-circuit.webp` — empty night track for check-in and lobby, about 168 KB.
+
+The complete generation prompts are recorded in `src/assets/artwork/README.md`. Font licensing is in `src/assets/fonts/OFL-Goldman.txt`. These original backgrounds follow the reference composition; they are not the reference poster/screenshots embedded as backgrounds.
+
+**Artwork still needed:** the approved CPC Club logo file. The current small CPC mark is a native placeholder. All three required cinematic backgrounds are supplied locally.
+
+### Modified source
+
+- `src/pages/LandingPage.tsx`, `LoginPage.tsx`, `CheckInPage.tsx`, `LobbyPage.tsx`: existing page components restyled and recomposed.
+- `src/components/RacingIdentity.tsx`: reusable racing wordmark, CPC placeholder, checkered flag and circuit mini-map.
+- `src/components/Layout.tsx`: unobtrusive entry-screen navigation and context-aware header/footer; existing route guards retained.
+- `src/components/Countdown.tsx`: preserves the date countdown and adds an hours/minutes/seconds display for the lobby; days are included in the total hours.
+- `src/styles/racing-redesign.css`, `src/index.css`: scoped cinematic styling and responsive layouts. Other route styles remain in place.
+- `src/components/ArenaWorkspace.tsx`, `src/styles/arena-foundation.css`: reusable three-pane arena layout slots for the next phase, including a CodeMirror-compatible editor region. This foundation is not mounted on the Phase 1 placeholder route.
+- `src/assets/artwork/`, `src/assets/fonts/`: original artwork, local display font, provenance and license.
+- `README.md`: current setup, testing and handoff notes.
+
+The existing `App.tsx` route architecture, authentication context, service modules, check-in hook, data and TypeScript types are preserved. No dependencies were added. Arena, volunteer, results and 404 routes retain their existing behavior.
+
+## Pages and manual verification
+
+| Route | What to test |
+| --- | --- |
+| `/` | Inspect the cinematic hero, live countdown and CTA. Test Home/About/Rules/Schedule/Contact navigation, lower sections and the mobile menu. |
+| `/login` | Submit empty fields and incorrect credentials; toggle password visibility. Expand **Preview access**, choose **Use demo credentials**, then select **ENTER THE GRID**. Verify loading and error feedback. |
+| `/check-in` | Confirm driver identity. Enable and allow the camera, then activate fullscreen. Accept the rules. All four required checks must pass before START YOUR ENGINE enables. Press Esc to confirm fullscreen readiness clears, then reactivate and proceed. |
+| `/lobby` | Confirm identity, check-in status, verification time and date countdown. Station remains “To be assigned” because no real assignment was provided. Use Waiting, Live race and Finished mock controls; follow the arena/results links. |
+| `/arena` | Complete check-in first. Confirm the existing Phase 1 skeleton and return-to-lobby link. |
+| `/volunteer` | Confirm the existing operations skeleton. |
+| `/results` | Confirm the existing results skeleton; no standings are fabricated. |
+| Unknown path | Verify 404 and return-to-grid link. |
+
+Demo Driver ID: `CGP2026`  
+Demo password: `Race2026!`
+
+The mock identity uses sessionStorage when available; no password is stored. Check-in remains in memory. Reloading a protected lobby/arena route requires fresh checks. Sign out clears the identity and check-in state.
+
+### Device and failure cases
+
+- Deny camera permission: actionable feedback appears; entry remains disabled. Update browser site permissions and retry.
+- Missing/busy/disconnected camera: verify the appropriate feedback and incomplete camera check.
+- Navigate away while camera permission is pending: a later-granted stream is immediately stopped.
+- Exit fullscreen: readiness clears. An unsupported or denied fullscreen request shows an error.
+- Leave check-in: media tracks stop. The lobby reports a completed local camera check, not an active feed.
+- Test keyboard access, visible focus, the skip link, reduced motion and mobile navigation.
+
+## Validation
+
+The redesign was rendered in an isolated headless Chrome browser and captured at **1440×900**, **1366×768** **768×900**, **390×844** and **360×800**. Screenshots for the four entry pages are retained in `.qa/redesign-{landing,login,inspection,lobby}-{width}x{height}.png` (local, ignored by Git). The screenshots were visually compared with references 01–04. Corrections included angular typography, upright timer numerals, compact inspection spacing and title alignment.
+
+Browser checks cover empty/invalid login, password visibility, demo autofill/sign-in, both route guards, camera-denied feedback, simulated camera streaming, actual browser fullscreen activation/exit, acknowledgment gating, system status, camera cleanup, lobby states, remaining routes, sign-out and mobile navigation. No runtime exceptions were observed. Physical camera hardware and other browsers still need on-device checks.
+
+`npm.cmd run build` and `npm.cmd run lint` both passed after the final changes.
+
+## Backend and timing boundaries
+
+The API remains modular: replace `authService.login` with the real backend implementation and use the existing Axios client in `src/services/api.ts`. `VITE_API_BASE_URL` may configure the future endpoint. Never put secrets in frontend environment values.
+
+Authentication, role access, contest state, check-in validation, session security, scoring and results must be authoritative on the backend. Mock lobby controls remain explicitly labeled and do not start a real contest. The volunteer route contains no privileged operations.
+
+The countdown still targets the start of **November 23 at 00:00 IST**, matching the provided event date. Race start time is TBA and displayed separately. Lobby total hours includes remaining days. Final rules require CPC Club confirmation.
+
+Camera preview stays entirely local: no audio request, recording or upload. No hidden solutions/test cases, DevTools blocking, backend implementation or Monaco editor was added. CodeMirror 6 dependencies remain ready for the next phase.
+
+This is a local repository change. A future static deployment must rewrite BrowserRouter deep links to `index.html`.
+
