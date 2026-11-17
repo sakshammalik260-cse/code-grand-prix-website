@@ -1,13 +1,13 @@
-﻿import type { ProblemInput } from '../../types/problems'
+import type { ProblemInput } from '../../types/problems'
 import type { Problem,ProblemSummary } from '../../types/arena'
 const supportedLanguages=['cpp','python','java','javascript']
 // Whitelist fields so administration metadata never enters candidate rendering or draft requests.
 export function questionPayload(value:ProblemInput):ProblemInput {
- return {title:value.title,difficulty:value.difficulty,points:value.points,statement:value.statement,inputFormat:value.inputFormat,outputFormat:value.outputFormat,constraints:value.constraints,samples:value.samples.map(s=>({id:s.id,input:s.input,output:s.output,explanation:s.explanation})),timeLimitMs:value.timeLimitMs,memoryLimitMb:value.memoryLimitMb,expectedTimeComplexity:value.expectedTimeComplexity,expectedSpaceComplexity:value.expectedSpaceComplexity,allowedLanguages:value.allowedLanguages,roundId:value.roundId}
+ return {title:value.title,difficulty:value.difficulty,points:value.points,statement:value.statement,inputFormat:value.inputFormat,outputFormat:value.outputFormat,constraints:value.constraints,samples:value.samples.map(s=>({id:s.id,input:s.input,output:s.output,explanation:s.explanation})),timeLimitMs:value.timeLimitMs,memoryLimitMb:value.memoryLimitMb,expectedTimeComplexity:value.expectedTimeComplexity,expectedSpaceComplexity:value.expectedSpaceComplexity,allowedLanguages:value.allowedLanguages,roundId:value.roundId,hints:(value.hints||[]).map(h=>({id:h.id,order:h.order,deductionPoints:h.deductionPoints,content:h.content}))}
 }
 function record(value:unknown):Record<string,unknown>{if(!value||typeof value!=='object')throw new Error('Invalid question response. Refresh or contact race control.');return value as Record<string,unknown>}
 function assertPublic(value:Record<string,unknown>){
- if(['hiddenTests','hiddenTestCases','testcases','referenceSolution','solution'].some(key=>key in value)||('status'in value&&value.status!=='PUBLISHED'))throw new Error('The question response does not match the public contest contract. Contact race control.')
+ if(['hiddenTests','hiddenTestCases','testcases','referenceSolution','solution','hints'].some(key=>key in value)||('status'in value&&value.status!=='PUBLISHED'))throw new Error('The question response does not match the public contest contract. Contact race control.')
 }
 export function parseProblemSummary(value:unknown):ProblemSummary {
  const item=record(value);assertPublic(item)

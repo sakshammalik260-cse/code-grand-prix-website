@@ -51,7 +51,7 @@ export function LoginPage() {
           {error && <p className="alert alert-error" role="alert">{error}</p>}
           <button type="submit" className="button button-primary racing-button w-full" disabled={loading}><span>{loading ? <><LoaderCircle size={17} className="spin" /> CHECKING CREDENTIALS</> : <>ENTER THE GRID <ArrowRight size={19} /></>}</span></button>
         </form>
-        <p className="login-signature">CPC <span>|</span> Code Grand Prix</p>
+        <p className="login-signature">Competitive Programming Club <span>|</span> Code Grand Prix</p>
         {isDevelopmentMock && DevelopmentAccounts && <Suspense fallback={null}><DevelopmentAccounts onSelect={(id,secret)=>{setDriverId(id);setPassword(secret);setErrors({});setError('')}}/></Suspense>}
         {authError && <p className="field-error" role="alert">{authError}</p>}
         <p className="login-help">Need your credentials? Contact a CPC Club volunteer.</p>

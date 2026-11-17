@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, Braces, CalendarDays, Check, Flag, Gauge, Map
 import { Countdown } from '../components/Countdown'
 import { Badge } from '../components/Ui'
 import { event, rules } from '../data/event'
-import { CheckeredFlag, RaceWordmark } from '../components/RacingIdentity'
+import { CheckeredFlag, ClubLogo, RaceWordmark } from '../components/RacingIdentity'
 
 export function LandingPage() {
   return <>
@@ -15,9 +15,10 @@ export function LandingPage() {
           <h1><RaceWordmark className="hero-wordmark" /><span className="sr-only">2026</span></h1>
           <p className="circuit-tagline">THE ULTIMATE CODING CIRCUIT</p>
           <p className="race-mantra"><span>CODE</span><i>//</i><span>COMPILE</span><i>//</i><span>CONQUER</span></p>
-          <p className="hero-event-label">23 NOVEMBER 2026 <span>·</span> CPC CLUB</p>
+
         </motion.div>
         <div className="hero-grid-entry">
+          <p className="hero-event-label"><strong>23 NOVEMBER 2026</strong><span>CPC / COMPETITIVE PROGRAMMING CLUB</span></p>
           <div className="race-countdown-panel"><h2>RACE STARTS IN</h2><Countdown /><p className="countdown-caption">Countdown to event date · Race start time TBA</p></div>
           <Link className="button button-primary racing-button" to="/login"><span>ENTER THE GRID <ArrowRight size={20} /></span></Link>
           <p className="hero-university">{event.university}</p>
@@ -27,6 +28,7 @@ export function LandingPage() {
     </section>
     <section id="schedule" className="race-strip"><div className="container race-strip-inner"><div className="race-date"><CalendarDays size={23} /><div><span>MARK YOUR CALENDAR</span><strong>23 NOVEMBER 2026</strong><small>Monday <i /> India Standard Time</small></div></div><div className="countdown-wrap"><div><span className="eyebrow-sm">THE GRID OPENS IN</span><small>Countdown to event date • Start time TBA</small></div><Countdown compact /></div><span className="strip-number">LIGHTS OUT.<br /><strong>LOGIC ON.</strong></span></div></section>
     <section id="about" className="container content-section">
+      <div className="home-organizer"><span>ORGANIZED BY</span><ClubLogo/><p>{event.university}</p></div>
       <div className="section-title"><div><div className="eyebrow"><span /> MORE THAN A CODING CONTEST</div><h2>Built for minds<br />that <em>race ahead.</em></h2></div><p>Code Grand Prix brings the intensity of the circuit to competitive programming. Think clearly, solve precisely and keep pushing until the chequered flag.</p></div>
       <div className="feature-grid">{[
         { icon: Braces, number: '01', title: 'Logic is your engine.', text: 'Take on algorithmic challenges that put your problem-solving skills in the driving seat.' },

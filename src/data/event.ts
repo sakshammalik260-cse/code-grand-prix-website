@@ -1,7 +1,7 @@
 export const event = {
   contestId: 'cgp-2026-round-01',
   name: 'Code Grand Prix 2026',
-  organizer: 'CPC Club',
+  organizer: 'CPC - Competitive Programming Club',
   university: 'Jain (Deemed-to-be) University',
   dateLabel: 'November 23, 2026',
   // Date-only countdown. The competition's start time is still to be announced.

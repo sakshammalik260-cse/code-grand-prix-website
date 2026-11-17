@@ -1,6 +1,8 @@
+import type { AdminHint } from './assist'
 import type { LanguageId, Problem, ProblemSummary, ContestPhase } from './arena'
 export type PublicationStatus = 'DRAFT' | 'SCHEDULED' | 'PUBLISHED'
 export interface AdminProblem extends Problem {
+  hints?: AdminHint[]
   allowedLanguages: LanguageId[]
   roundId: string | null
   status: PublicationStatus

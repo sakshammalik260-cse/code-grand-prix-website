@@ -1,5 +1,6 @@
+import type { HintReceipt,MockScoreRecord } from '../../types/assist'
 import type { CompetitionSession, Incident } from '../../types/monitoring'
-export interface Ledger { sessions: Record<string, CompetitionSession>; incidents: Incident[] }
+export interface Ledger { sessions: Record<string, CompetitionSession>; incidents: Incident[]; hintUnlocks?:Record<string,HintReceipt>; scores?:Record<string,MockScoreRecord> }
 let opening: Promise<IDBDatabase> | undefined
 function open() {
   if (!opening) opening = new Promise<IDBDatabase>((resolve,reject) => {

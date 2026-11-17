@@ -1,6 +1,7 @@
+import { readProgress } from './mockProgress'
 import type { ArenaServiceContract } from '../../types/arena'
 import { candidateProblemService } from '../problems'
-import { delay,getMockContest,readProgress } from './mockState'
+import { delay,getMockContest } from './mockState'
 import { executionService } from './execution'
 import { submissionService } from './submission'
 export const mockArenaServices: ArenaServiceContract = {
@@ -10,5 +11,5 @@ export const mockArenaServices: ArenaServiceContract = {
   ...executionService,
   ...submissionService,
   async getSession(driverId, signal) { await delay(120, signal); return { driverId, active: !!driverId, simulation: true } },
-  async getProgress(contestId, driverId, signal) { await delay(80, signal); return {...readProgress(contestId, driverId),totalProblems:(await candidateProblemService.list(signal)).length} },
+  async getProgress(contestId, driverId, signal) { await delay(80, signal); return {...await readProgress(contestId, driverId),totalProblems:(await candidateProblemService.list(signal)).length} },
 }

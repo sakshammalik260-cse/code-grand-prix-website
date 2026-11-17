@@ -1,4 +1,4 @@
-import type { ContestPhase, ContestState, DriverProgress, MockScenario } from '../../types/arena'
+import type { ContestPhase, ContestState, MockScenario } from '../../types/arena'
 import { candidateProblemService } from '../problems'
 import { event } from '../../data/event'
 
@@ -61,30 +61,6 @@ export const mockControls = {
     contest = { ...getMockContest(), status: 'LIVE', contestStartTime: new Date(Date.now() - 1000).toISOString(), contestEndTime: new Date(Date.now() + 5000).toISOString(), pausedAt: undefined }
     persistContest(); return getMockContest()
   },
-}
-const progressCache = new Map<string, DriverProgress>()
-export function readProgress(contestId: string, driverId: string): DriverProgress {
-  const key = `cgp-mock-progress:${contestId}:${driverId}`
-  let data = progressCache.get(key)
-  if (!data) {
-    try {
-      const stored = JSON.parse(sessionStorage.getItem(key) || 'null') as DriverProgress | null
-      if (stored?.contestId === contestId && stored.driverId === driverId && Array.isArray(stored.attemptedProblemIds)
-        && stored.attemptedProblemIds.every(id => typeof id === 'string') && Array.isArray(stored.solvedProblemIds)
-        && stored.solvedProblemIds.every(id => typeof id === 'string') && typeof stored.currentScore === 'number') data = stored
-    } catch { /* Memory fallback. */ }
-  }
-  return data || { contestId, driverId, totalProblems: 0, attemptedProblemIds: [], solvedProblemIds: [], currentScore: 0, simulation: true }
-}
-export function updateMockProgress(contestId: string, driverId: string, problemId: string, accepted: boolean, points = 0) {
-  const previous = readProgress(contestId, driverId)
-  const solved = new Set(previous.solvedProblemIds)
-  if (accepted) solved.add(problemId)
-  const next: DriverProgress = { ...previous, attemptedProblemIds: [...new Set([...previous.attemptedProblemIds, problemId])], solvedProblemIds: [...solved], currentScore: previous.currentScore + (accepted && !previous.solvedProblemIds.includes(problemId) ? points : 0), simulation: true }
-  const key = `cgp-mock-progress:${contestId}:${driverId}`
-  progressCache.set(key, next)
-  try { sessionStorage.setItem(key, JSON.stringify(next)) } catch { /* Not an official score; memory fallback. */ }
-  return next
 }
 export function assertLiveContest(contestId: string) {
   const current = getMockContest()

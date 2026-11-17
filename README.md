@@ -2,11 +2,19 @@
 
 Existing React + TypeScript + Vite frontend for CPC Club at Jain (Deemed-to-be) University. Event date: **November 23, 2026**.
 
+## Phase 4.1 - Race Assist, Driver Standings and CPC branding
+
+Race Assist now provides confirmed, idempotent paid hints; administrators configure hints in the existing question editor. The arena includes a free in-page Syntax Guide that copies basic boilerplate without replacing drafts. The existing results route now shows Driver Standings with judged scores, hint penalties, current-driver highlighting and visibility enforcement.
+
+The supplied official CPC logos are integrated in the navbar, homepage organizer area and footer. The event/date information now sits above the right-hand countdown, away from the racing car, on a readable dark backing. The racing background remains unchanged.
+
+See [Phase 4.1 features, API contracts, mock scoring and testing](docs/phase-4-1-enhancements.md). Backend integration is paused: **only an explicit `VITE_ARENA_MODE=api` enables backend requests**. Development uses the existing mock accounts; production never falls back to mock services. Earlier phase notes below describe historical behavior where superseded.
+
 ## Phase 4 - Roles and organizer questions
 
 The existing app now supports CANDIDATE, VOLUNTEER and ADMIN accounts, role-protected routes and an F1-themed 403 page. Administration includes a question bank, validated question/examples editor, test-case forms, round assignment, publication scheduling, round management, participant sessions and results visibility. The arena dynamically fetches published eligible questions and applies each question's language allowlist while preserving drafts and Phase 3 monitoring.
 
-See [administration, role permissions, proposed APIs and testing](docs/admin-question-management.md) for the complete handoff. **Mock services and the three demo accounts work only with `npm run dev`. Production and `npm run preview` require the backend and never fall back to mock data.** Hidden test inputs/outputs are not stored in the development mock; only public cases and hidden metadata persist. Real hidden-case storage/judging requires the backend.
+See [administration, role permissions, proposed APIs and testing](docs/admin-question-management.md) for the complete handoff. **Mock services and the three demo accounts work only with `npm run dev`. An explicitly API-configured production build requires the backend and never falls back to mock data. Without API configuration, requests are blocked before transport.** Hidden test inputs/outputs are not stored in the development mock; only public cases and hidden metadata persist. Real hidden-case storage/judging requires the backend.
 
 Demo candidate: `CGP2026` / `Race2026!`; volunteer: `VOLUNTEER2026` / `Marshal2026!`; admin: `ADMIN2026` / `Control2026!`. These public test accounts and seed statements are excluded from production builds. The old volunteer preview role switch and candidate self-approval have been removed; sign in with a separate staff account to authorize incidents.
 
@@ -42,7 +50,7 @@ On Windows with PowerShell scripts disabled, use `npm.cmd` instead of `npm`. Cam
 
 ## Reference-matched visual redesign
 
-The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. Phase 2 implements reference 05; Phase 3 implements reference 06 and the volunteer dashboard from reference 07; reference 08 remains later-phase work.
+The four entry pages follow `design-reference/DESIGN_SPEC.md` and references 01–04. All nine supplied images were inspected. Phase 2 implements reference 05; Phase 3 implements reference 06 and the volunteer dashboard from reference 07; Phase 4.1 implements the existing results route using reference 08.
 
 | Page | Visual changes |
 | --- | --- |
@@ -63,7 +71,7 @@ Original images were generated using the built-in imagegen tool and copied into 
 
 The complete generation prompts are recorded in `src/assets/artwork/README.md`. Font licensing is in `src/assets/fonts/OFL-Goldman.txt`. These original backgrounds follow the reference composition; they are not the reference poster/screenshots embedded as backgrounds.
 
-**Artwork still needed:** the approved CPC Club logo file. The current small CPC mark is a native placeholder. All three required cinematic backgrounds are supplied locally.
+The official CPC mark and full logo are now supplied under `public/branding` and integrated by Phase 4.1. All three cinematic backgrounds remain unchanged.
 
 ### Modified source
 
@@ -89,7 +97,7 @@ The existing `App.tsx` route architecture, authentication context, service modul
 | `/arena` | Complete check-in and select Live race in the mock lobby. Verify problems/languages, scoped autosave, refresh recovery, Run/Submit simulations, errors, timer states and progress. |
 | `/volunteer` | Sign in as VOLUNTEER or ADMIN. Search/review incidents and test KEEP LOCKED, ESCALATE and AUTHORIZE RESUME. |
 | `/admin` | Sign in as ADMIN. Test question creation/editing, cases, filtering, assignment, publication, rounds and results visibility. |
-| `/results` | Confirm the existing results skeleton; no standings are fabricated. |
+| `/results` | Verify visibility, judged mock scores, paid hint penalties, current-driver highlighting and live refresh. |
 | Unknown path | Verify 404 and return-to-grid link. |
 
 Demo Driver ID: `CGP2026`  

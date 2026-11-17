@@ -3,7 +3,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { ArrowUpRight, Flag, LogOut, Menu, X } from 'lucide-react'
 import { useSession } from '../hooks/useSession'
 import { roleHome } from '../services/access'
-import { ClubMark, RaceWordmark } from './RacingIdentity'
+import { ClubMark, ClubLogo, RaceWordmark } from './RacingIdentity'
 
 export function Brand() {
   return <Link to="/" className="brand" aria-label="Code Grand Prix home"><span className="brand-mark"><Flag size={25} fill="currentColor" /></span><span>CODE GRAND PRIX<small>CPC CLUB <i /> SEASON 2026</small></span></Link>
@@ -24,7 +24,7 @@ export function Layout() {
   const open = menuPath === pathname
   const cinematic = ['/', '/login', '/check-in', '/lobby'].includes(pathname)
   const home = pathname === '/'
-  if (pathname === '/arena' || pathname.startsWith('/volunteer') || pathname.startsWith('/admin')) return <div className="arena-route-shell"><ScrollToPage /><a className="skip-link" href={pathname==='/arena'?'#arena-language':'#main'}>{pathname==='/arena'?'Skip to code editor':'Skip to content'}</a><main id="main" tabIndex={-1}><Outlet /></main></div>
+  if (pathname === '/results' || pathname === '/arena' || pathname.startsWith('/volunteer') || pathname.startsWith('/admin')) return <div className="arena-route-shell"><ScrollToPage /><a className="skip-link" href={pathname==='/arena'?'#arena-language':'#main'}>{pathname==='/arena'?'Skip to code editor':'Skip to content'}</a><main id="main" tabIndex={-1}><Outlet /></main></div>
   return <div className={cinematic ? `app-shell cinematic-shell ${home ? 'home-shell' : 'entry-shell'} ${pathname === '/login' ? 'login-shell' : ''}` : 'app-shell'}>
     <ScrollToPage /><a className="skip-link" href="#main">Skip to content</a>
     <header className={`site-header ${cinematic ? 'race-header' : ''}`}><div className="nav-shell">
@@ -38,7 +38,7 @@ export function Layout() {
       <div className="nav-actions">{!cinematic && <span className="season-label"><span className="status-dot" /> RACE WEEK</span>}{driver ? <><Link className="nav-cta" to={roleHome(driver.role)}>{driver.id}<ArrowUpRight size={16} /></Link><button className="icon-button" onClick={signOut} aria-label="Sign out"><LogOut size={17} /></button></> : <Link className="nav-cta" to="/login">Driver login <ArrowUpRight size={16} /></Link>}</div>
     </div></header>
     <main id="main" tabIndex={-1}><Outlet /></main>
-    {(!cinematic || home) && <footer id="contact" className="site-footer"><Brand /><p>Built for the thrill of solving.</p><span>© 2026 CPC Club <span className="footer-divider">/</span> Jain (Deemed-to-be) University</span></footer>}
+    {(!cinematic || home) && <footer id="contact" className="site-footer"><Link to="/" aria-label="Competitive Programming Club home"><ClubLogo className="cpc-footer-logo"/></Link><p>Built for the thrill of solving.</p><span>© 2026 CPC Club <span className="footer-divider">/</span> Jain (Deemed-to-be) University</span></footer>}
   </div>
 }
 export function RequireDriver() {

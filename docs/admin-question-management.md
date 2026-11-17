@@ -1,4 +1,6 @@
-﻿# Administration and custom questions (Phase 4)
+> Phase 4.1 adds hints and standings. Backend transport now requires an explicit VITE_ARENA_MODE=api; unconfigured production requests are blocked. See [current enhancements and contracts](phase-4-1-enhancements.md).
+
+# Administration and custom questions (Phase 4)
 
 Phase 4 extends the existing React/TypeScript app. The backend is not implemented. All endpoints below are proposed contracts and must be agreed with the backend team.
 

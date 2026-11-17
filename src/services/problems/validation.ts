@@ -1,4 +1,5 @@
-﻿import type { ProblemInput, TestCaseInput, ContestRound } from '../../types/problems'
+import { validateHints } from '../assist/rules.ts'
+import type { ProblemInput, TestCaseInput, ContestRound } from '../../types/problems'
 const languageIds=['python','java','cpp','javascript']
 export function validateProblem(input:ProblemInput):string[] {
   const errors:string[]=[]
@@ -11,6 +12,7 @@ export function validateProblem(input:ProblemInput):string[] {
   if(!Number.isInteger(input.timeLimitMs)||input.timeLimitMs<100||input.timeLimitMs>60000)errors.push('Time limit must be an integer from 100 to 60,000 ms.')
   if(!Number.isInteger(input.memoryLimitMb)||input.memoryLimitMb<16||input.memoryLimitMb>4096)errors.push('Memory limit must be an integer from 16 to 4,096 MB.')
   if(!input.samples.length || input.samples.some(sample=>!sample.input.trim()||!sample.output.trim()))errors.push('Add at least one complete public sample input and output.')
+  errors.push(...validateHints(input.hints||[]))
   return errors
 }
 export function validateTestCase(input:TestCaseInput):string[] {

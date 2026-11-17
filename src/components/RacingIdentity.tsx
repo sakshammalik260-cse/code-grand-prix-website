@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 interface RaceWordmarkProps { className?: string }
 export function RaceWordmark({ className = '' }: RaceWordmarkProps) {
@@ -10,7 +10,10 @@ export function RaceWordmark({ className = '' }: RaceWordmarkProps) {
 }
 
 export function ClubMark({ compact = false }: { compact?: boolean }) {
-  return <Link to="/" className={`club-mark ${compact ? 'club-mark-compact' : ''}`} aria-label="CPC Club home"><span className="club-symbol" aria-hidden="true"><i /><i /><i /><i /></span><span><strong>CPC</strong><small>Coding &amp; Programming Club</small></span></Link>
+ return <Link to="/" className={`club-mark ${compact ? 'club-mark-compact' : ''}`} aria-label="Competitive Programming Club home"><img src="/branding/cpc-mark-transparent.png" alt="Competitive Programming Club" className="cpc-navbar-mark" width="1590" height="665"/><span className="sr-only">CPC</span></Link>
+}
+export function ClubLogo({className=''}:{className?:string}){
+ return <img src="/branding/cpc-logo-transparent.png" alt="CPC - Competitive Programming Club. Build, solve, improve." width="1776" height="889" className={`cpc-full-logo ${className}`} loading="lazy"/>
 }
 
 export function CheckeredFlag({ className = '' }: { className?: string }) {

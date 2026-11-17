@@ -6,6 +6,7 @@
 @import './styles/arena-foundation.css';
 @import './styles/monitoring.css';
 @import './styles/admin.css';
+@import './styles/phase-4-1.css';
 
 @theme {
   --color-racing-red: #e10600;
