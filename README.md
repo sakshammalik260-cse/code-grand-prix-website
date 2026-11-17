@@ -2,11 +2,21 @@
 
 Existing React + TypeScript + Vite frontend for CPC Club at Jain (Deemed-to-be) University. Event date: **November 23, 2026**.
 
+## Phase 4 - Roles and organizer questions
+
+The existing app now supports CANDIDATE, VOLUNTEER and ADMIN accounts, role-protected routes and an F1-themed 403 page. Administration includes a question bank, validated question/examples editor, test-case forms, round assignment, publication scheduling, round management, participant sessions and results visibility. The arena dynamically fetches published eligible questions and applies each question's language allowlist while preserving drafts and Phase 3 monitoring.
+
+See [administration, role permissions, proposed APIs and testing](docs/admin-question-management.md) for the complete handoff. **Mock services and the three demo accounts work only with `npm run dev`. Production and `npm run preview` require the backend and never fall back to mock data.** Hidden test inputs/outputs are not stored in the development mock; only public cases and hidden metadata persist. Real hidden-case storage/judging requires the backend.
+
+Demo candidate: `CGP2026` / `Race2026!`; volunteer: `VOLUNTEER2026` / `Marshal2026!`; admin: `ADMIN2026` / `Control2026!`. These public test accounts and seed statements are excluded from production builds. The old volunteer preview role switch and candidate self-approval have been removed; sign in with a separate staff account to authorize incidents.
+
+Validation commands: `npm.cmd run build`, `npm.cmd run lint`, `node scripts/verify-questions.mjs`, `node scripts/verify-monitoring.mjs`, `node scripts/verify-drafts.mjs`.
+
 ## Phase 3 - Session monitoring and volunteer review
 
 Active-arena monitoring now reports hidden tabs, separate window-focus signals, fullscreen exits and local camera interruptions. Race Control preserves the mounted editor, results and autosaved drafts while enforcing session policy. Confirmed service approval and restored monitoring setup are required to resume. The existing official clock continues during locks.
 
-The `/volunteer` route now provides an explicitly labeled mock review flow and an API role gate. Development-only simulation controls are omitted from production JavaScript. Camera access is shared across check-in, lobby and arena, then released on sign-out or leaving those routes.
+The `/volunteer` route now provides a role-protected mock review flow and an API role gate. Development-only simulation controls are omitted from production JavaScript. Camera access is shared across check-in, lobby and arena, then released on sign-out or leaving those routes.
 
 See [Phase 3 files, API contracts, verification and organizer recovery procedure](docs/phase-3-monitoring.md). The backend remains unimplemented; browser monitoring and mock persistence are not security enforcement.
 
@@ -77,7 +87,8 @@ The existing `App.tsx` route architecture, authentication context, service modul
 | `/check-in` | Confirm driver identity. Enable and allow the camera, then activate fullscreen. Accept the rules. All four required checks must pass before START YOUR ENGINE enables. Press Esc to confirm fullscreen readiness clears, then reactivate and proceed. |
 | `/lobby` | Confirm identity, check-in status, verification time and date countdown. Station remains “To be assigned” because no real assignment was provided. Use Waiting, Live race and Finished mock controls; follow the arena/results links. |
 | `/arena` | Complete check-in and select Live race in the mock lobby. Verify problems/languages, scoped autosave, refresh recovery, Run/Submit simulations, errors, timer states and progress. |
-| `/volunteer` | Enter the explicit mock volunteer preview. Search/review incidents and test KEEP LOCKED, ESCALATE and AUTHORIZE RESUME. |
+| `/volunteer` | Sign in as VOLUNTEER or ADMIN. Search/review incidents and test KEEP LOCKED, ESCALATE and AUTHORIZE RESUME. |
+| `/admin` | Sign in as ADMIN. Test question creation/editing, cases, filtering, assignment, publication, rounds and results visibility. |
 | `/results` | Confirm the existing results skeleton; no standings are fabricated. |
 | Unknown path | Verify 404 and return-to-grid link. |
 
@@ -107,7 +118,7 @@ Browser checks cover empty/invalid login, password visibility, demo autofill/sig
 
 The API remains modular: replace `authService.login` with the real backend implementation and use the existing Axios client in `src/services/api.ts`. `VITE_API_BASE_URL` may configure the future endpoint. Never put secrets in frontend environment values.
 
-Authentication, role access, contest state, check-in validation, session security, scoring and results must be authoritative on the backend. Mock lobby controls remain explicitly labeled and do not start a real contest. The volunteer API must enforce privileged roles server-side. Mock volunteer access is explicitly labeled demo access.
+Authentication, role access, contest state, check-in validation, session security, scoring and results must be authoritative on the backend. Mock lobby controls remain explicitly labeled and do not start a real contest. The volunteer API must enforce privileged roles server-side. Development volunteer access requires its separate test account.
 
 The countdown still targets the start of **November 23 at 00:00 IST**, matching the provided event date. Race start time is TBA and displayed separately. Lobby total hours includes remaining days. Final rules require CPC Club confirmation.
 

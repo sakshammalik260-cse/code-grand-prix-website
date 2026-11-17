@@ -17,7 +17,7 @@ export class MonitoringClient {
   private permissionDepth = 0
   private permissionUntil = 0
   constructor(privateScope: ParticipantScope) {
-    this.scope = privateScope
+    this.scope = {contestId:privateScope.contestId,driverId:privateScope.driverId}
     this.journalKey = `cgp-monitor-pending:${privateScope.contestId}:${privateScope.driverId}`
     this.lockKey = `cgp-monitor-locked:${privateScope.contestId}:${privateScope.driverId}`
     let rememberedLock: CompetitionSession | null = null

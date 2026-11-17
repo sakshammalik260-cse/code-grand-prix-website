@@ -1,45 +1,42 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CheckInRecord, Driver } from '../types'
 import { SessionContext } from './session'
 import { event } from '../data/event'
-const key = 'cgp-demo-driver'
+import { authService } from '../services/auth'
+import { isDevelopmentMock } from '../services/mode'
 const receiptKey = `cgp-demo-check-in-v1:${event.contestId}`
-function readDriver(): Driver | null {
-  try {
-    const value: unknown = JSON.parse(sessionStorage.getItem(key) || 'null')
-    if (value && typeof value === 'object' && 'id' in value && 'name' in value && 'team' in value
-      && typeof value.id === 'string' && typeof value.name === 'string' && typeof value.team === 'string') return value as Driver
-  } catch { /* Session storage may be unavailable; use memory instead. */ }
-  return null
-}
-function readCheckIn(): CheckInRecord | null {
-  try {
-    const driver = readDriver()
-    const value = JSON.parse(sessionStorage.getItem(receiptKey) || 'null') as Partial<CheckInRecord> | null
-    if (driver && value?.driverId === driver.id && value.cameraVerified === true && value.fullscreenVerified === true
-      && value.rulesAccepted === true && typeof value.completedAt === 'string' && Number.isFinite(Date.parse(value.completedAt))) return value as CheckInRecord
-  } catch { /* A missing receipt requires the real check-in flow. */ }
-  return null
-}
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [driver, setDriver] = useState<Driver | null>(readDriver)
-  const [checkIn, setCheckIn] = useState<CheckInRecord | null>(readCheckIn)
+  const [driver,setDriver]=useState<Driver | null>(null)
+  const [loading,setLoading]=useState(true)
+  const [authError,setAuthError]=useState('')
+  const [checkIn,setCheckIn]=useState<CheckInRecord | null>(null)
+  useEffect(()=>{
+    const controller=new AbortController()
+    authService.me(controller.signal).then(user=>{
+      if (controller.signal.aborted) return
+      setDriver(user)
+      if (isDevelopmentMock && user?.role==='CANDIDATE') try {
+        const record=JSON.parse(sessionStorage.getItem(receiptKey)||'null') as CheckInRecord | null
+        if (record?.driverId===user.id && record.cameraVerified && record.fullscreenVerified && record.rulesAccepted && Number.isFinite(Date.parse(record.completedAt))) setCheckIn(record)
+      } catch { /* Recheck inspection when receipt is unavailable. */ }
+    }).catch(error=>{if(!controller.signal.aborted)setAuthError(error instanceof Error?error.message:'Unable to verify account.')}).finally(()=>{if(!controller.signal.aborted)setLoading(false)})
+    return ()=>controller.abort()
+  },[])
   function signIn(next: Driver) {
-    setDriver(next)
-    setCheckIn(null)
-    try { sessionStorage.setItem(key, JSON.stringify(next)); sessionStorage.removeItem(receiptKey) } catch { /* In-memory session remains available. */ }
+    setDriver(next);setLoading(false);setAuthError('');setCheckIn(null)
+    if (isDevelopmentMock) try {sessionStorage.setItem('cgp-demo-driver',JSON.stringify({id:next.id}));sessionStorage.removeItem(receiptKey)}catch{/* Demo memory session. */}
   }
   function completeCheckIn(record: CheckInRecord) {
     setCheckIn(record)
-    // Demo receipt only. It does not claim the camera or fullscreen remains active after navigation/reload.
-    try { sessionStorage.setItem(receiptKey, JSON.stringify(record)) } catch { /* In-memory check-in remains available. */ }
+    if(isDevelopmentMock)try{sessionStorage.setItem(receiptKey,JSON.stringify(record))}catch{/* Memory receipt. */}
   }
   function signOut() {
-    setDriver(null)
-    setCheckIn(null)
-    try { sessionStorage.removeItem(key); sessionStorage.removeItem(receiptKey) } catch { /* In-memory session is cleared. */ }
-    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {})
+    void authService.logout().then(()=>{
+      setDriver(null);setCheckIn(null);setAuthError('')
+      try{sessionStorage.removeItem(receiptKey)}catch{/* Memory session cleared. */}
+      if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{})
+    }).catch(error=>setAuthError(error instanceof Error?error.message:'Sign out failed. Retry.'))
   }
-  return <SessionContext.Provider value={{ driver, checkIn, signIn, signOut, completeCheckIn }}>{children}</SessionContext.Provider>
+  return <SessionContext.Provider value={{driver,checkIn,loading,authError,signIn,signOut,completeCheckIn}}>{children}</SessionContext.Provider>
 }

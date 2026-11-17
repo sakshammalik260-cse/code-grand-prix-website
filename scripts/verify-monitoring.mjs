@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict'
+import assert from 'node:assert/strict'
 import { canAcceptSession, sessionAllowsExecution } from '../src/services/monitoring/sessionRules.ts'
 const scope={contestId:'cgp',driverId:'driver'}
 const incident={id:'incident-1',clientEventId:'event-1',sessionId:'session-1',...scope,type:'TAB_HIDDEN',observedAt:'2026-11-17T10:00:00Z',timestamp:'2026-11-17T10:00:01Z',reviewStatus:'OPEN',blocking:true,simulation:true}
@@ -13,7 +13,7 @@ assert.equal(canAcceptSession(locked,{...base,revision:1},scope),false)
 console.log('PASS scope/session identity and stale revisions are checked')
 assert.equal(canAcceptSession(locked,{...base,revision:3},scope),false)
 assert.equal(canAcceptSession(locked,{...approved,resumeAuthorization:null},scope),false)
-assert.equal(canAcceptSession(locked,{...approved,resumeAuthorization:{...receipt,actorRole:'PARTICIPANT'}},scope),false)
+assert.equal(canAcceptSession(locked,{...approved,resumeAuthorization:{...receipt,actorRole:'CANDIDATE'}},scope),false)
 assert.equal(canAcceptSession(locked,{...approved,resumeAuthorization:{...receipt,decision:'KEEP_LOCKED'}},scope),false)
 console.log('PASS locks cannot be cleared by an active flag, missing approval, participant role or keep-locked decision')
 assert.equal(canAcceptSession(locked,{...approved,resumeAuthorization:{...receipt,decidedAt:'2026-11-17T09:00:00Z'}},scope),false)

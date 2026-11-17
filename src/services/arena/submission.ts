@@ -1,13 +1,13 @@
 import { assertMockMonitoringExecution } from '../monitoring/mock'
 import type { MockScenario, SubmissionRequest, SubmissionResult } from '../../types/arena'
 import { executionFixture, validateSource } from './execution'
-import { ArenaServiceError, assertLiveContest, delay, mockControls, updateMockProgress } from './mockState'
+import { ArenaServiceError, assertLiveContest, delay, findMockProblem, mockControls, updateMockProgress } from './mockState'
 
 interface MockJob { request: SubmissionRequest; initial: SubmissionResult; started: number; scenario: MockScenario; final?: SubmissionResult }
 const jobs = new Map<string, MockJob>()
 export const submissionService = {
   async submitCode(request: SubmissionRequest, signal?: AbortSignal): Promise<SubmissionResult> {
-    validateSource(request); assertLiveContest(request.contestId); await assertMockMonitoringExecution(request, request.sessionId)
+    await validateSource(request); assertLiveContest(request.contestId); await assertMockMonitoringExecution(request, request.sessionId)
     const scenario = mockControls.submissionScenario
     await delay(350, signal)
     await assertMockMonitoringExecution(request, request.sessionId)
@@ -26,10 +26,10 @@ export const submissionService = {
     if (elapsed < 650) return { ...job.initial, status: 'QUEUED' }
     if (elapsed < 1550) return { ...job.initial, status: 'RUNNING' }
     if (job.scenario === 'NETWORK_ERROR') throw new ArenaServiceError('Could not retrieve the simulated submission result. Please retry.')
-    const execution = executionFixture(job.request, job.scenario)
+    const execution = await executionFixture(job.request, job.scenario)
     job.final = { ...job.initial, status: job.scenario, execution }
     // Demo progress is updated only from the service result, never from source inspection.
-    updateMockProgress(job.request.contestId, job.request.driverId, job.request.problemId, job.scenario === 'ACCEPTED')
+    updateMockProgress(job.request.contestId, job.request.driverId, job.request.problemId, job.scenario === 'ACCEPTED', (await findMockProblem(job.request.problemId)).points)
     return job.final
   },
 }

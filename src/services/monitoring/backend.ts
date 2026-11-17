@@ -3,7 +3,7 @@ import type { Incident, IncidentAcknowledgment, MonitoringService, CompetitionSe
 export const backendMonitoringService: MonitoringService = {
   async getSession(scope,signal) {
     const { data } = await api.get<SessionEnvelope>('/session',{ params: { contestId: scope.contestId }, signal })
-    if (!data.session || data.session.driverId !== scope.driverId || data.viewer.role !== 'PARTICIPANT') throw Object.assign(new Error('Participant session is missing or expired. Sign in again or contact race control.'), { code: 'AUTH_EXPIRED' })
+    if (!data.session || data.session.driverId !== scope.driverId || data.viewer.role !== 'CANDIDATE') throw Object.assign(new Error('Participant session is missing or expired. Sign in again or contact race control.'), { code: 'AUTH_EXPIRED' })
     return data.session
   },
   async getViewer(signal) { return (await api.get<SessionEnvelope>('/session',{signal})).data.viewer },

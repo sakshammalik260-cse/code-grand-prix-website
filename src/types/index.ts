@@ -1,4 +1,5 @@
-export interface Driver { id: string; name: string; team: string }
+export type Role = 'CANDIDATE' | 'VOLUNTEER' | 'ADMIN'
+export interface Driver { id: string; name: string; team: string; role: Role }
 export interface CheckInRecord {
   driverId: string
   completedAt: string

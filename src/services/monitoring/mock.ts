@@ -1,3 +1,4 @@
+import { authService } from '../auth'
 import type { CompetitionSession, Incident, MonitoringService, ParticipantScope, ResolutionResponse, SessionStatus } from '../../types/monitoring'
 import { ledgerTransaction } from './ledger'
 import { sessionAllowsExecution } from './sessionRules'
@@ -11,6 +12,7 @@ const key = (scope: ParticipantScope) => `${scope.contestId}:${scope.driverId}`
 export function mockConnectionAvailable() {
   try { return sessionStorage.getItem('cgp-monitor-demo-offline') !== '1' && navigator.onLine } catch { return navigator.onLine }
 }
+async function privileged(signal?:AbortSignal){const user=await authService.me(signal);if(!user||!['VOLUNTEER','ADMIN'].includes(user.role))throw new MonitoringTransportError('Volunteer or admin account required.','AUTH_EXPIRED')}
 async function prepare(signal?: AbortSignal) {
   if (!mockConnectionAvailable()) throw new MonitoringTransportError('Mock monitoring connection is offline. Drafts remain local; reconnect or contact race control.')
   await delay(100, signal)
@@ -34,9 +36,9 @@ export const mockMonitoringService: MonitoringService = {
   },
   async getViewer(signal) {
     await prepare(signal)
-    let volunteer = false
-    try { volunteer = sessionStorage.getItem('cgp-mock-volunteer-preview') === '1' } catch { /* Explicit preview entry remains necessary. */ }
-    return { id: volunteer ? 'DEMO-VOLUNTEER' : 'DEMO-PARTICIPANT', role: volunteer ? 'VOLUNTEER' : 'PARTICIPANT', simulation: true }
+    const user=await authService.me(signal)
+    if (!user) throw new MonitoringTransportError('Sign in to view race control.','AUTH_EXPIRED')
+    return {id:user.id,role:user.role,simulation:true}
   },
   async reportIncident(request,signal) {
     await prepare(signal)
@@ -54,12 +56,12 @@ export const mockMonitoringService: MonitoringService = {
       return { incident, session: { ...next, serverTime: new Date().toISOString() } }
     })
   },
-  async listIncidents(signal) { await prepare(signal); return ledgerTransaction(false,ledger => ledger.incidents.slice().sort((a,b) => b.timestamp.localeCompare(a.timestamp))) },
-  async listParticipants(signal) { await prepare(signal); return ledgerTransaction(false,ledger => Object.values(ledger.sessions)) },
+  async listIncidents(signal) { await prepare(signal); await privileged(signal); return ledgerTransaction(false,ledger => ledger.incidents.slice().sort((a,b) => b.timestamp.localeCompare(a.timestamp))) },
+  async listParticipants(signal) { await prepare(signal); await privileged(signal); return ledgerTransaction(false,ledger => Object.values(ledger.sessions)) },
   async resolveIncident(id,request,signal) {
     await prepare(signal)
     const viewer = await this.getViewer(signal)
-    if (viewer.role !== 'VOLUNTEER' && viewer.role !== 'ORGANIZER') throw new MonitoringTransportError('Enter the explicitly labeled volunteer preview to resolve mock incidents.','AUTH_EXPIRED')
+    if (viewer.role !== 'VOLUNTEER' && viewer.role !== 'ADMIN') throw new MonitoringTransportError('Sign in with a volunteer or admin development account to resolve mock incidents.','AUTH_EXPIRED')
     return ledgerTransaction<ResolutionResponse>(true,ledger => {
       const incident = ledger.incidents.find(item => item.id === id)
       if (!incident) throw new Error('This incident is unavailable. Refresh the review list.')
@@ -69,7 +71,7 @@ export const mockMonitoringService: MonitoringService = {
       incident.reviewStatus = request.decision === 'AUTHORIZE_RESUME' ? 'AUTHORIZED' : request.decision === 'ESCALATE' ? 'ESCALATED' : 'KEPT_LOCKED'
       const outstanding = ledger.incidents.filter(item => item.sessionId === session.id && item.blocking && item.reviewStatus !== 'AUTHORIZED')
       const status = outstanding.some(item => item.reviewStatus === 'ESCALATED') ? 'UNDER_REVIEW' : outstanding.length ? 'LOCKED' : 'RESUME_AUTHORIZED'
-      const authorization = { id: crypto.randomUUID(), incidentId: id, decision: request.decision, actorId: viewer.id, actorRole: viewer.role as 'VOLUNTEER' | 'ORGANIZER', decidedAt: new Date().toISOString(), simulation: true }
+      const authorization = { id: crypto.randomUUID(), incidentId: id, decision: request.decision, actorId: viewer.id, actorRole: viewer.role as 'VOLUNTEER' | 'ADMIN', decidedAt: new Date().toISOString(), simulation: true }
       const next = changeState(session,status)
       next.latestIncident = ledger.incidents.find(item => item.sessionId === session.id) || null
       next.resumeAuthorization = status === 'RESUME_AUTHORIZED' && request.decision === 'AUTHORIZE_RESUME' ? authorization : null

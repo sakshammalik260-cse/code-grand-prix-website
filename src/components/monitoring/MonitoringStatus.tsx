@@ -1,4 +1,4 @@
-﻿import { Camera, CameraOff, Expand, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { Camera, CameraOff, Expand, ShieldCheck, ShieldAlert } from 'lucide-react'
 import type { CameraStatus, CompetitionSession, ConnectionStatus } from '../../types/monitoring'
 interface Props { camera: CameraStatus; fullscreen: boolean; session: CompetitionSession | null; connection: ConnectionStatus; locked: boolean }
 export function MonitoringStatus({ camera, fullscreen, session, connection, locked }: Props) {

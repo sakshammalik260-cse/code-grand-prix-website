@@ -3,6 +3,7 @@ export interface ProgrammingLanguage { id: LanguageId; label: string; fileName: 
 export type ProblemDifficulty = 'Easy' | 'Medium' | 'Hard'
 export interface PublicSample { id: string; input: string; output: string; explanation: string }
 export interface ProblemSummary {
+  allowedLanguages?: LanguageId[]
   id: string
   number: number
   title: string
@@ -10,6 +11,7 @@ export interface ProblemSummary {
   points: number
 }
 export interface Problem extends ProblemSummary {
+  allowedLanguages: LanguageId[]
   statement: string[]
   inputFormat: string[]
   outputFormat: string

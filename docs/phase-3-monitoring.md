@@ -1,4 +1,6 @@
-﻿# Phase 3: session monitoring and volunteer review
+> Phase 4 supersedes the role names, mock role selector and self-approval controls in this historical guide. Roles are now CANDIDATE, VOLUNTEER and ADMIN. Staff authorization requires a separate staff account; production always uses API adapters. See [current contracts and recovery changes](admin-question-management.md).
+
+# Phase 3: session monitoring and volunteer review
 
 Implemented in the existing React application; no backend or dependencies added. The arena remains mounted under the Race Control overlay. CodeMirror 6, selected problem/language, results, drafts and the official countdown are preserved. A lock never grants time or independently pauses the clock. Existing server-authorized contest pause handling remains in the arena clock.
 

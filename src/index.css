@@ -5,6 +5,7 @@
 @import './styles/racing-redesign.css';
 @import './styles/arena-foundation.css';
 @import './styles/monitoring.css';
+@import './styles/admin.css';
 
 @theme {
   --color-racing-red: #e10600;
@@ -14,5 +15,3 @@
   --color-success: #00d084;
   --color-warning: #ffcc00;
 }
-
-

@@ -1,4 +1,4 @@
-﻿export type IncidentType = 'TAB_HIDDEN' | 'WINDOW_FOCUS_LOST' | 'FULLSCREEN_EXIT' | 'CAMERA_INTERRUPTED'
+export type IncidentType = 'TAB_HIDDEN' | 'WINDOW_FOCUS_LOST' | 'FULLSCREEN_EXIT' | 'CAMERA_INTERRUPTED'
 export type SessionStatus = 'ACTIVE' | 'LOCK_PENDING' | 'LOCKED' | 'UNDER_REVIEW' | 'RESUME_AUTHORIZED' | 'FINISHED'
 export type CameraStatus = 'ACTIVE' | 'INTERRUPTED' | 'PERMISSION_REQUIRED' | 'UNAVAILABLE'
 export type ReviewStatus = 'OPEN' | 'AUTHORIZED' | 'KEPT_LOCKED' | 'ESCALATED'
@@ -24,7 +24,7 @@ export interface Authorization {
   incidentId: string
   decision: ResolutionDecision
   actorId: string
-  actorRole: 'VOLUNTEER' | 'ORGANIZER'
+  actorRole: 'VOLUNTEER' | 'ADMIN'
   decidedAt: string
   simulation: boolean
 }
@@ -40,7 +40,7 @@ export interface CompetitionSession extends ParticipantScope {
   volunteerNotified: boolean
   simulation: boolean
 }
-export interface Viewer { id: string; role: 'PARTICIPANT' | 'VOLUNTEER' | 'ORGANIZER'; simulation: boolean }
+export interface Viewer { id: string; role: 'CANDIDATE' | 'VOLUNTEER' | 'ADMIN'; simulation: boolean }
 export interface SessionEnvelope { viewer: Viewer; session: CompetitionSession | null; serverTime: string }
 export interface IncidentAcknowledgment { incident: Incident; session: CompetitionSession }
 export interface ResolutionRequest { decision: ResolutionDecision; expectedSessionRevision: number; note: string }

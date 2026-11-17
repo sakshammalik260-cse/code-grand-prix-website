@@ -18,7 +18,7 @@ export function canAcceptSession(previous: CompetitionSession | null, next: Comp
   const unlocking = ['ACTIVE','RESUME_AUTHORIZED'].includes(next.status)
   if ((lockedBefore && unlocking) || next.status === 'RESUME_AUTHORIZED') {
     const receipt = next.resumeAuthorization
-    if (!receipt || typeof receipt.id !== 'string' || !receipt.id || typeof receipt.actorId !== 'string' || !receipt.actorId || typeof receipt.incidentId !== 'string' || receipt.decision !== 'AUTHORIZE_RESUME' || !['VOLUNTEER','ORGANIZER'].includes(receipt.actorRole) || !Number.isFinite(Date.parse(receipt.decidedAt))) return false
+    if (!receipt || typeof receipt.id !== 'string' || !receipt.id || typeof receipt.actorId !== 'string' || !receipt.actorId || typeof receipt.incidentId !== 'string' || receipt.decision !== 'AUTHORIZE_RESUME' || !['VOLUNTEER','ADMIN'].includes(receipt.actorRole) || !Number.isFinite(Date.parse(receipt.decidedAt))) return false
     if (previous && next.revision <= previous.revision) return false
     if (lockedBefore && previous.latestIncident && Date.parse(receipt.decidedAt) < Date.parse(previous.latestIncident.timestamp)) return false
   }

@@ -1,14 +1,18 @@
-﻿import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, UserRound } from 'lucide-react'
 import { authService } from '../services/auth'
-import { demoCredentials } from '../data/event'
+import { isDevelopmentMock } from '../services/mode'
+import { roleHome } from '../services/access'
 import { useSession } from '../hooks/useSession'
 import { CheckeredFlag, RaceWordmark } from '../components/RacingIdentity'
 
+const DevelopmentAccounts = import.meta.env.DEV ? lazy(()=>import('../components/DevelopmentAccounts')) : null
+
 export function LoginPage() {
-  const { driver, signIn } = useSession()
+  const { driver, loading:authLoading, authError, signIn } = useSession()
+  const location=useLocation()
   const navigate = useNavigate()
   const [driverId, setDriverId] = useState('')
   const [password, setPassword] = useState('')
@@ -16,7 +20,8 @@ export function LoginPage() {
   const [errors, setErrors] = useState<{ driverId?: string; password?: string }>({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  if (driver) return <Navigate to="/check-in" replace />
+  if(authLoading)return <div className="arena-load-screen" role="status">Verifying your account...</div>
+  if (driver) return <Navigate to={roleHome(driver.role)} replace />
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const next = { driverId: !driverId.trim() ? 'Enter your Driver ID.' : undefined, password: !password ? 'Enter your password.' : undefined }
@@ -24,7 +29,7 @@ export function LoginPage() {
     setError('')
     if (next.driverId || next.password) return
     setLoading(true)
-    try { signIn(await authService.login({ driverId, password })); navigate('/check-in', { replace: true }) }
+    try { const account=await authService.login({ driverId, password }); signIn(account); const from=(location.state as {from?:string})?.from; const allowed=account.role==='ADMIN'?from?.startsWith('/admin') || from?.startsWith('/volunteer'):account.role==='VOLUNTEER'?from?.startsWith('/volunteer'):from?.startsWith('/check-in'); navigate(allowed && from?from:roleHome(account.role), { replace: true }) }
     catch (err) { setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.') }
     finally { setLoading(false) }
   }
@@ -47,7 +52,8 @@ export function LoginPage() {
           <button type="submit" className="button button-primary racing-button w-full" disabled={loading}><span>{loading ? <><LoaderCircle size={17} className="spin" /> CHECKING CREDENTIALS</> : <>ENTER THE GRID <ArrowRight size={19} /></>}</span></button>
         </form>
         <p className="login-signature">CPC <span>|</span> Code Grand Prix</p>
-        <details className="login-preview-access"><summary>Preview access <span>MOCK MODE</span></summary><div><p>Driver ID: <code>{demoCredentials.driverId}</code><br />Password: <code>{demoCredentials.password}</code></p><button className="text-link" type="button" disabled={loading} onClick={() => { setDriverId(demoCredentials.driverId); setPassword(demoCredentials.password); setErrors({}); setError('') }}>Use demo credentials <ArrowRight size={14} /></button></div></details>
+        {isDevelopmentMock && DevelopmentAccounts && <Suspense fallback={null}><DevelopmentAccounts onSelect={(id,secret)=>{setDriverId(id);setPassword(secret);setErrors({});setError('')}}/></Suspense>}
+        {authError && <p className="field-error" role="alert">{authError}</p>}
         <p className="login-help">Need your credentials? Contact a CPC Club volunteer.</p>
       </section>
     </div>

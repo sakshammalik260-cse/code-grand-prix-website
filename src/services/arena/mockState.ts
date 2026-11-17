@@ -1,5 +1,5 @@
 import type { ContestPhase, ContestState, DriverProgress, MockScenario } from '../../types/arena'
-import { mockProblems } from '../../data/problems'
+import { candidateProblemService } from '../problems'
 import { event } from '../../data/event'
 
 export const mockContestId = event.contestId
@@ -20,7 +20,7 @@ export function errorMessage(error: unknown): string {
 }
 function readContest(): ContestState {
   try {
-    const stored = JSON.parse(sessionStorage.getItem('cgp-mock-contest-v1') || 'null') as ContestState | null
+    const stored = JSON.parse(localStorage.getItem('cgp-mock-contest-v1') || sessionStorage.getItem('cgp-mock-contest-v1') || 'null') as ContestState | null
     if (stored?.id === mockContestId && ['WAITING','LIVE','PAUSED_BY_ORGANIZER','FINISHED'].includes(stored.status)
       && Number.isFinite(Date.parse(stored.contestStartTime)) && Number.isFinite(Date.parse(stored.contestEndTime))
       && (stored.status !== 'PAUSED_BY_ORGANIZER' || Number.isFinite(Date.parse(stored.pausedAt || '')))) return stored
@@ -29,8 +29,10 @@ function readContest(): ContestState {
   return { id: mockContestId, title: 'Code Grand Prix 2026', round: 'Round 01', status: 'WAITING', contestStartTime: new Date(now + 1800000).toISOString(), contestEndTime: new Date(now + 12600000).toISOString(), serverTime: new Date(now).toISOString(), simulation: true }
 }
 let contest = readContest()
-function persistContest() { try { sessionStorage.setItem('cgp-mock-contest-v1', JSON.stringify(contest)) } catch { /* Memory fallback. */ } }
+function persistContest() { try { localStorage.setItem('cgp-mock-contest-v1', JSON.stringify(contest)); sessionStorage.setItem('cgp-mock-contest-v1', JSON.stringify(contest)) } catch { /* Memory fallback. */ } }
+export function setMockContest(next:ContestState){contest=next;persistContest()}
 export function getMockContest(): ContestState {
+  contest=readContest()
   if (contest.status === 'LIVE' && Date.now() >= Date.parse(contest.contestEndTime)) {
     contest = { ...contest, status: 'FINISHED' }; persistContest()
   }
@@ -72,13 +74,13 @@ export function readProgress(contestId: string, driverId: string): DriverProgres
         && stored.solvedProblemIds.every(id => typeof id === 'string') && typeof stored.currentScore === 'number') data = stored
     } catch { /* Memory fallback. */ }
   }
-  return data || { contestId, driverId, totalProblems: mockProblems.length, attemptedProblemIds: [], solvedProblemIds: [], currentScore: 0, simulation: true }
+  return data || { contestId, driverId, totalProblems: 0, attemptedProblemIds: [], solvedProblemIds: [], currentScore: 0, simulation: true }
 }
-export function updateMockProgress(contestId: string, driverId: string, problemId: string, accepted: boolean) {
+export function updateMockProgress(contestId: string, driverId: string, problemId: string, accepted: boolean, points = 0) {
   const previous = readProgress(contestId, driverId)
   const solved = new Set(previous.solvedProblemIds)
   if (accepted) solved.add(problemId)
-  const next: DriverProgress = { ...previous, attemptedProblemIds: [...new Set([...previous.attemptedProblemIds, problemId])], solvedProblemIds: [...solved], currentScore: mockProblems.filter(problem => solved.has(problem.id)).reduce((sum, problem) => sum + problem.points, 0), simulation: true }
+  const next: DriverProgress = { ...previous, attemptedProblemIds: [...new Set([...previous.attemptedProblemIds, problemId])], solvedProblemIds: [...solved], currentScore: previous.currentScore + (accepted && !previous.solvedProblemIds.includes(problemId) ? points : 0), simulation: true }
   const key = `cgp-mock-progress:${contestId}:${driverId}`
   progressCache.set(key, next)
   try { sessionStorage.setItem(key, JSON.stringify(next)) } catch { /* Not an official score; memory fallback. */ }
@@ -89,8 +91,6 @@ export function assertLiveContest(contestId: string) {
   if (current.id !== contestId) throw new ArenaServiceError('This contest is unavailable. Refresh race status and try again.')
   if (current.status !== 'LIVE') throw new ArenaServiceError('The race is not accepting requests right now. Your draft is safe.')
 }
-export function findMockProblem(id: string) {
-  const problem = mockProblems.find(item => item.id === id)
-  if (!problem) throw new ArenaServiceError('This problem could not be found. Select a problem from the race list.')
-  return problem
+export async function findMockProblem(id: string) {
+  return candidateProblemService.get(id)
 }
