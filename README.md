@@ -2,6 +2,12 @@
 
 Existing React + TypeScript + Vite frontend for CPC Club at Jain (Deemed-to-be) University. Event date: **November 23, 2026**.
 
+## Phase 4.2 - About CPC, scrolling and access audit
+
+The homepage now places the official About CPC section directly after the cinematic hero, with the supplied four-paragraph description, club philosophy, original full logo and BUILD / SOLVE / IMPROVE cards. Public navigation stays visible, transitions to a dark surface while scrolling, and uses header-aware section links with reduced-motion support. The racing hero/background and competition flows are preserved.
+
+Staff/results pages have their own scroll containers; the arena retains its fixed cockpit and native pane scrolling. Existing role guards were audited rather than rewritten. See [Phase 4.2 changes, role matrix and verification](docs/phase-4-2-scroll-security.md). Backend authorization remains pending.
+
 ## Phase 4.1 - Race Assist, Driver Standings and CPC branding
 
 Race Assist now provides confirmed, idempotent paid hints; administrators configure hints in the existing question editor. The arena includes a free in-page Syntax Guide that copies basic boilerplate without replacing drafts. The existing results route now shows Driver Standings with judged scores, hint penalties, current-driver highlighting and visibility enforcement.

@@ -1,0 +1,163 @@
+﻿/* Public section navigation uses the document scroll; cockpit panes keep native scrolling. */
+html { scroll-behavior: smooth; }
+.public-site-shell { --public-header-height: 83px; }
+.public-site-shell.cinematic-shell { --public-header-height: 88px; }
+.public-site-shell .site-header {
+  position: sticky;
+  top: 0;
+  height: var(--public-header-height);
+  z-index: 40;
+  transition: background-color 180ms ease, backdrop-filter 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+.public-site-shell .race-header {
+  margin-bottom: calc(-1 * var(--public-header-height));
+  border-bottom: 1px solid transparent;
+}
+.home-shell .site-header:not(.is-scrolled) {
+  background: linear-gradient(180deg, #060709a6, transparent);
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.public-site-shell .site-header.is-scrolled {
+  background: #0b0b0feb;
+  border-bottom-color: #ffffff1a;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px #0003;
+}
+.public-site-shell :is(#about, #rules, #schedule, #contact) { scroll-margin-top: calc(var(--public-header-height) + 24px); }
+.public-site-shell #home { scroll-margin-top: 0; }
+.public-site-shell .navigation.open { top: calc(var(--public-header-height) - 1px); }
+
+/* One official About CPC section, directly below the existing cinematic hero. */
+.cpc-about {
+  position: relative;
+  padding: 96px 0 100px;
+  background: radial-gradient(ellipse at 5% 35%, #00d08409, transparent 40%), #0b0b0f;
+  border-bottom: 1px solid #282c31;
+  color: #f5f5f5;
+}
+.cpc-about::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: max(56px, calc((100% - 1300px) / 2));
+  width: 90px;
+  height: 3px;
+  background: linear-gradient(90deg, #e10600 0 42%, transparent 42% 50%, #00d084 50%);
+}
+.cpc-about-heading { margin-bottom: 48px; }
+.cpc-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font: 10px Consolas, monospace;
+  letter-spacing: 2px;
+  color: #9da7b8;
+}
+.cpc-section-label > span { width: 21px; height: 2px; background: #e10600; }
+.cpc-about-heading h2 {
+  font: 700 clamp(32px, 3.6vw, 48px)/1.2 Goldman, 'Arial Black', sans-serif;
+  letter-spacing: -1.5px;
+  margin: 19px 0 18px;
+  color: #f5f5f5;
+}
+.cpc-about-heading > p { font-size: 13px; font-weight: 600; letter-spacing: 1.7px; line-height: 1.8; color: #8bdfbd; }
+.cpc-about-layout { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.6fr); align-items: start; gap: 60px; }
+.cpc-about-identity {
+  margin: 0;
+  padding: 30px 28px 23px;
+  border: 1px solid #33463d;
+  border-radius: 7px;
+  background: radial-gradient(ellipse at 50% 42%, #00d08412, transparent 68%), linear-gradient(140deg, #151b1b, #0f1217);
+  overflow: hidden;
+}
+.cpc-identity-label { display: block; color: #8eaa9e; font: 9px Consolas, monospace; letter-spacing: 2px; }
+.cpc-about-identity .cpc-about-logo { width: 100%; height: auto; max-width: 360px; object-fit: contain; margin: 38px auto 30px; }
+.cpc-about-identity figcaption { text-align: center; color: #c2cbd0; font-size: 12px; line-height: 1.8; }
+.cpc-identity-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  color: #82998d;
+  font: 9px Consolas, monospace;
+  letter-spacing: 1px;
+  border-top: 1px solid #314139;
+  padding-top: 22px;
+  margin-top: 28px;
+}
+.cpc-identity-footer > span { width: 23px; height: 3px; background: #00d084; transform: skew(-25deg); }
+.cpc-about-description > p { color: #c8cdd6; font-size: 16px; line-height: 1.9; margin: 0 0 23px; }
+.cpc-about-description > p:first-child { color: #edf0f3; font-size: 18px; line-height: 1.8; }
+.cpc-philosophy { border-left: 3px solid #00d084; padding: 22px 26px; margin: 30px 0 0; background: linear-gradient(110deg, #00d0840e, #14171c); border-radius: 0 5px 5px 0; }
+.cpc-philosophy > span { display: block; font: 9px Consolas, monospace; color: #7fe5b9; letter-spacing: 2px; margin-bottom: 13px; }
+.cpc-philosophy > p { font-size: 16px; line-height: 1.9; color: #e0e9e3; margin: 0; }
+.cpc-pillars { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 55px; }
+.cpc-pillar { position: relative; padding: 29px 28px 34px; border: 1px solid #30373e; border-radius: 6px; background: linear-gradient(135deg, #181c22, #111419); transition: border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease; }
+.cpc-pillar:hover { border-color: #00d08480; box-shadow: 0 0 24px #00d0840b; }
+.cpc-pillar-top { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.cpc-pillar-top svg { color: #8de8bc; }
+.cpc-pillar-top > span { font: 9px Consolas, monospace; letter-spacing: 1.5px; color: #7e8998; }
+.cpc-pillar h3 { font-family: Goldman, 'Arial Black', sans-serif; font-size: 21px; color: #f5f5f5; margin: 0 0 14px; }
+.cpc-pillar p { font-size: 14px; line-height: 1.8; color: #abb5c1; margin: 0; max-width: 35ch; }
+.cpc-pillar-line { position: absolute; bottom: 0; left: 28px; width: 36px; height: 2px; background: #e10600; transition: background-color 180ms ease, width 180ms ease; }
+.cpc-pillar:hover .cpc-pillar-line { background: #00d084; width: 62px; }
+
+/* Each staff/results route owns its scroll container; the arena remains a fixed cockpit. */
+.dashboard-route-shell, .dashboard-route-shell > main { height: 100dvh; min-height: 0; }
+.dashboard-route-shell { overflow: hidden; background: #0b0b0f; }
+.dashboard-route-shell > main { overflow: auto; scroll-behavior: auto; }
+.volunteer-route-shell > main { overflow: hidden; }
+.dashboard-route-shell .admin-topbar, .dashboard-route-shell .standings-header { position: sticky; top: 0; z-index: 30; }
+.dashboard-route-shell .admin-topbar { background: #101117f5; backdrop-filter: blur(12px); }
+.dashboard-route-shell .admin-sidebar { position: sticky; top: 80px; align-self: start; height: calc(100dvh - 82px); overflow-y: auto; }
+.dashboard-route-shell .volunteer-topbar { position: relative; z-index: 30; }
+
+@media (max-width: 1150px) {
+  .cpc-about-layout { gap: 36px; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.5fr); }
+  .cpc-about-description > p { font-size: 15px; }
+  .cpc-about-description > p:first-child { font-size: 17px; }
+  .cpc-philosophy { padding: 20px; }
+  .cpc-philosophy > p { font-size: 15px; }
+  .cpc-pillar { padding: 25px 22px 30px; }
+}
+@media (max-width: 900px) {
+  .public-site-shell.cinematic-shell { --public-header-height: 76px; }
+  .cpc-about { padding: 72px 0; }
+  .cpc-about-layout { grid-template-columns: minmax(190px, .7fr) minmax(0, 1.4fr); gap: 28px; }
+  .cpc-about-identity { padding: 24px 18px; }
+  .cpc-about-identity .cpc-about-logo { margin-top: 34px; }
+  .cpc-identity-footer { font-size: 7px; gap: 10px; letter-spacing: .5px; }
+  .cpc-pillars { gap: 15px; margin-top: 36px; }
+  .cpc-pillar { padding: 22px 18px 28px; }
+  .cpc-pillar p { font-size: 13px; }
+}
+@media (max-width: 720px) {
+  .dashboard-route-shell .admin-sidebar { position: static; height: auto; overflow-y: visible; }
+}
+@media (max-width: 700px) {
+  .public-site-shell { --public-header-height: 72px; }
+  .public-site-shell.cinematic-shell { --public-header-height: 74px; }
+  .cpc-about { padding: 58px 0 62px; }
+  .cpc-about::before { left: 20px; }
+  .cpc-about-heading { margin-bottom: 30px; }
+  .cpc-about-heading h2 { font-size: clamp(28px, 7.8vw, 40px); letter-spacing: -.8px; }
+  .cpc-about-heading > p { font-size: 11px; letter-spacing: 1px; }
+  .cpc-section-label { font-size: 8px; letter-spacing: 1.5px; }
+  .cpc-about-layout { display: flex; flex-direction: column; gap: 29px; }
+  .cpc-about-identity { width: 100%; padding: 24px; }
+  .cpc-about-identity .cpc-about-logo { max-width: 290px; margin-block: 27px 23px; }
+  .cpc-identity-footer { font-size: 8px; }
+  .cpc-about-description > p { font-size: 15px; line-height: 1.9; margin-bottom: 22px; }
+  .cpc-about-description > p:first-child { font-size: 16px; }
+  .cpc-philosophy { padding: 18px 20px; }
+  .cpc-pillars { grid-template-columns: 1fr; gap: 14px; margin-top: 32px; }
+  .cpc-pillar { padding: 25px 24px 30px; }
+  .cpc-pillar-top { margin-bottom: 18px; }
+  .cpc-pillar p { font-size: 14px; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .public-site-shell .site-header, .cpc-pillar, .cpc-pillar-line { transition: none; }
+}
