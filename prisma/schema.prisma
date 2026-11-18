@@ -1,0 +1,288 @@
+// ==============================================================================
+// CODE GRAND PRIX 2026 — PRISMA DATABASE SCHEMA (POSTGRESQL)
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------------------------------
+
+enum Role {
+  PARTICIPANT
+  VOLUNTEER
+}
+
+enum ContestStatus {
+  UPCOMING
+  LIVE
+  PAUSED
+  ENDED
+}
+
+enum CheckinStatus {
+  NOT_STARTED
+  PENDING
+  READY
+  BLOCKED
+}
+
+enum RaceSessionStatus {
+  WAITING
+  ACTIVE
+  LOCKED
+  FINISHED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ProblemStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+
+enum SubmissionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum Verdict {
+  QUEUED
+  RUNNING
+  ACCEPTED
+  WRONG_ANSWER
+  TIME_LIMIT_EXCEEDED
+  MEMORY_LIMIT_EXCEEDED
+  COMPILATION_ERROR
+  RUNTIME_ERROR
+  INTERNAL_ERROR
+}
+
+enum IncidentType {
+  TAB_HIDDEN
+  WINDOW_BLUR
+  FULLSCREEN_EXIT
+  CAMERA_TRACK_ENDED
+  CAMERA_PERMISSION_DENIED
+  NETWORK_RECONNECT
+}
+
+enum IncidentAction {
+  LOCK
+  LOG_ONLY
+}
+
+enum IncidentStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+// ------------------------------------------------------------------------------
+// MODELS
+// ------------------------------------------------------------------------------
+
+model User {
+  id           String      @id @default(uuid())
+  driverId     String      @unique // e.g. CGP_001, VOL_001
+  passwordHash String
+  displayName  String
+  role         Role        @default(PARTICIPANT)
+  lastLogoutAt DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sessions     Session[]
+  submissions  Submission[]
+  incidents    Incident[]  @relation("ParticipantIncidents")
+  auditLogs    AuditLog[]  @relation("VolunteerAuditLogs")
+  drafts       Draft[]
+
+  @@map("users")
+}
+
+model Contest {
+  id          String        @id // e.g. "cgp_2026"
+  title       String
+  status      ContestStatus @default(LIVE)
+  startsAt    DateTime
+  endsAt      DateTime
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  sessions    Session[]
+  problems    Problem[]
+
+  @@map("contests")
+}
+
+model Session {
+  id                  String            @id @default(uuid())
+  userId              String
+  contestId           String
+  status              RaceSessionStatus @default(WAITING)
+  checkinStatus       CheckinStatus     @default(NOT_STARTED)
+  rulesAccepted       Boolean           @default(false)
+  cameraPermission    Boolean           @default(false)
+  fullscreenRequested Boolean           @default(false)
+  cameraStatus        String            @default("DISCONNECTED")
+  lastSeenAt          DateTime          @default(now())
+  lockCount           Int               @default(0)
+  lockReason          String?
+  lockedAt            DateTime?
+  resumedAt           DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contest             Contest           @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  incidents           Incident[]
+
+  @@unique([userId, contestId])
+  @@map("sessions")
+}
+
+model Problem {
+  id               String        @id @default(uuid())
+  contestId        String
+  slug             String        @unique
+  title            String
+  difficulty       Difficulty
+  points           Int           // 100 (Easy), 250 (Medium), 500 (Hard)
+  order            Int           @default(1)
+  status           ProblemStatus @default(PUBLISHED)
+  statement        String        @db.Text
+  inputFormat      String        @db.Text
+  outputFormat     String        @db.Text
+  constraints      String        @db.Text
+  timeLimitMs      Int           @default(2000)
+  memoryLimitMb    Int           @default(256)
+  allowedLanguages String[]      @default(["python", "javascript", "cpp", "java"])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  contest          Contest       @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  testCases        TestCase[]
+  submissions      Submission[]
+  drafts           Draft[]
+
+  @@map("problems")
+}
+
+model TestCase {
+  id             String   @id @default(uuid())
+  problemId      String
+  input          String   @db.Text
+  expectedOutput String   @db.Text
+  isPublic       Boolean  @default(false) // Public sample test vs Hidden private test
+  explanation    String?  @db.Text
+  order          Int      @default(1)
+  createdAt      DateTime @default(now())
+
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@map("test_cases")
+}
+
+model Submission {
+  id          String           @id @default(uuid())
+  userId      String
+  problemId   String
+  languageId  String
+  sourceCode  String           @db.Text
+  status      SubmissionStatus @default(QUEUED)
+  verdict     Verdict          @default(QUEUED)
+  score       Int              @default(0)
+  passedTests Int              @default(0)
+  totalTests  Int              @default(0)
+  runtimeMs   Int?
+  memoryKb    Int?
+  message     String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem     Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, problemId])
+  @@map("submissions")
+}
+
+model Incident {
+  id               String         @id @default(uuid())
+  eventId          String         @unique
+  userId           String
+  sessionId        String
+  type             IncidentType
+  action           IncidentAction
+  status           IncidentStatus @default(OPEN)
+  occurredAt       DateTime
+  receivedAt       DateTime       @default(now())
+  details          String?        @db.Text
+  resolvedAt       DateTime?
+  resolvedBy       String?
+  resolutionAction String?
+  resolutionReason String?
+
+  user             User           @relation("ParticipantIncidents", fields: [userId], references: [id], onDelete: Cascade)
+  session          Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  auditLogs        AuditLog[]
+
+  @@index([userId, status])
+  @@map("incidents")
+}
+
+model AuditLog {
+  id            String    @id @default(uuid())
+  volunteerId   String
+  incidentId    String?
+  participantId String?
+  action        String
+  reason        String
+  previousState String?   @db.Text
+  newState      String?   @db.Text
+  createdAt     DateTime  @default(now())
+
+  volunteer     User      @relation("VolunteerAuditLogs", fields: [volunteerId], references: [id], onDelete: Cascade)
+  incident      Incident? @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+model Draft {
+  id         String   @id @default(uuid())
+  userId     String
+  problemId  String
+  languageId String
+  code       String   @db.Text
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem    Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId, languageId])
+  @@map("drafts")
+}
+
+model RevokedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("revoked_tokens")
+}
