@@ -31,9 +31,29 @@ export interface PublicProblemDetail {
   memoryLimitMb: number;
   allowedLanguages: string[];
   examples: Array<{
+    id?: string;
     input: string;
     expectedOutput: string;
     explanation?: string | null;
+  }>;
+}
+
+export interface InternalProblemWithTests {
+  id: string;
+  slug: string;
+  title: string;
+  difficulty: Difficulty;
+  points: number;
+  timeLimitMs: number;
+  memoryLimitMb: number;
+  allowedLanguages: string[];
+  testCases: Array<{
+    id: string;
+    input: string;
+    expectedOutput: string;
+    isPublic: boolean;
+    explanation?: string | null;
+    order: number;
   }>;
 }
 
@@ -104,7 +124,8 @@ export class ProblemRepository {
           timeLimitMs: problem.timeLimitMs,
           memoryLimitMb: problem.memoryLimitMb,
           allowedLanguages: problem.allowedLanguages,
-          examples: problem.testCases.map((tc) => ({
+          examples: problem.testCases.map((tc, idx) => ({
+            id: tc.id || `sample_${idx + 1}`,
             input: tc.input,
             expectedOutput: tc.expectedOutput,
             explanation: tc.explanation
@@ -135,11 +156,78 @@ export class ProblemRepository {
       allowedLanguages: found.allowedLanguages,
       examples: found.testCases
         .filter((tc) => tc.isPublic)
-        .map((tc) => ({
+        .map((tc, idx) => ({
+          id: `sample_${idx + 1}`,
           input: tc.input,
           expectedOutput: tc.expectedOutput,
           explanation: tc.explanation
         }))
+    };
+  }
+
+  /**
+   * Internal method for Judge Worker ONLY: includes private hidden tests.
+   * NEVER call this from public API endpoints!
+   */
+  static async findByIdWithAllTests(idOrSlug: string): Promise<InternalProblemWithTests | null> {
+    try {
+      const problem = await prisma.problem.findFirst({
+        where: {
+          OR: [{ id: idOrSlug }, { slug: idOrSlug }]
+        },
+        include: {
+          testCases: {
+            orderBy: { order: "asc" }
+          }
+        }
+      });
+
+      if (problem) {
+        return {
+          id: problem.id,
+          slug: problem.slug,
+          title: problem.title,
+          difficulty: problem.difficulty,
+          points: problem.points,
+          timeLimitMs: problem.timeLimitMs,
+          memoryLimitMb: problem.memoryLimitMb,
+          allowedLanguages: problem.allowedLanguages,
+          testCases: problem.testCases.map((tc, idx) => ({
+            id: tc.id || `tc_${idx + 1}`,
+            input: tc.input,
+            expectedOutput: tc.expectedOutput,
+            isPublic: tc.isPublic,
+            explanation: tc.explanation,
+            order: tc.order
+          }))
+        };
+      }
+    } catch {
+      // Fallback
+    }
+
+    const found = SEED_DATA.problems.find(
+      (p) => p.slug === idOrSlug || `prob_${p.slug}` === idOrSlug
+    );
+    if (!found) return null;
+
+    return {
+      id: `prob_${found.slug}`,
+      slug: found.slug,
+      title: found.title,
+      difficulty: found.difficulty,
+      points: found.points,
+      timeLimitMs: found.timeLimitMs,
+      memoryLimitMb: found.memoryLimitMb,
+      allowedLanguages: found.allowedLanguages,
+      testCases: found.testCases.map((tc, idx) => ({
+        id: `tc_${idx + 1}`,
+        input: tc.input,
+        expectedOutput: tc.expectedOutput,
+        isPublic: tc.isPublic,
+        explanation: tc.explanation,
+        order: idx + 1
+      }))
     };
   }
 }

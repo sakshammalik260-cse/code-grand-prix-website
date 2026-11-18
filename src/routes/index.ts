@@ -8,6 +8,7 @@ import { authRouter } from "./auth.routes.js";
 import { checkinRouter } from "./checkin.routes.js";
 import { contestRouter } from "./contest.routes.js";
 import { problemRouter } from "./problem.routes.js";
+import { submissionRouter } from "./submission.routes.js";
 
 export const apiRouter = Router();
 
@@ -25,3 +26,6 @@ apiRouter.use(contestRouter);
 
 // 5. Problems & Supported Languages
 apiRouter.use(problemRouter);
+
+// 6. Code Execution & Judging Submissions
+apiRouter.use(submissionRouter);

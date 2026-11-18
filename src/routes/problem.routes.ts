@@ -8,6 +8,11 @@ import { requireAuth } from "../middleware/auth.middleware.js";
 
 export const problemRouter = Router();
 
+// Candidate problem routes (supports both /contest/problems and /problems)
+problemRouter.get("/contest/problems", requireAuth, ProblemController.getProblems);
+problemRouter.get("/contest/problems/:id", requireAuth, ProblemController.getProblemById);
+
 problemRouter.get("/problems", requireAuth, ProblemController.getProblems);
 problemRouter.get("/problems/:id", requireAuth, ProblemController.getProblemById);
+
 problemRouter.get("/languages", ProblemController.getLanguages);
