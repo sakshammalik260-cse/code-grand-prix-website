@@ -23,6 +23,7 @@ export class SessionRepository {
           userId,
           contestId,
           status: RaceSessionStatus.WAITING,
+          revision: 1,
           checkinStatus: CheckinStatus.NOT_STARTED
         }
       });
@@ -36,6 +37,7 @@ export class SessionRepository {
           userId,
           contestId,
           status: RaceSessionStatus.WAITING,
+          revision: 1,
           checkinStatus: CheckinStatus.NOT_STARTED,
           rulesAccepted: false,
           cameraPermission: false,
@@ -52,6 +54,34 @@ export class SessionRepository {
       }
       return inMemorySessions.get(key)!;
     }
+  }
+
+  static async findById(id: string): Promise<Session | null> {
+    try {
+      const found = await prisma.session.findUnique({
+        where: { id }
+      });
+      if (found) return found;
+    } catch {
+      // In-memory fallback
+    }
+
+    for (const session of inMemorySessions.values()) {
+      if (session.id === id) return session;
+    }
+    return null;
+  }
+
+  static async findAll(): Promise<Session[]> {
+    try {
+      const sessions = await prisma.session.findMany({
+        include: { user: true }
+      });
+      if (sessions && sessions.length > 0) return sessions;
+    } catch {
+      // Fallback
+    }
+    return Array.from(inMemorySessions.values());
   }
 
   static async updateCheckin(
@@ -72,6 +102,7 @@ export class SessionRepository {
         },
         data: {
           ...data,
+          revision: { increment: 1 },
           lastSeenAt: new Date()
         }
       });
@@ -83,6 +114,7 @@ export class SessionRepository {
       session.fullscreenRequested = data.fullscreenRequested;
       session.checkinStatus = data.checkinStatus;
       session.status = data.status;
+      session.revision += 1;
       session.lastSeenAt = new Date();
       session.updatedAt = new Date();
       return session;
@@ -99,6 +131,7 @@ export class SessionRepository {
           status: RaceSessionStatus.LOCKED,
           lockReason: reason,
           lockedAt: new Date(),
+          revision: { increment: 1 },
           lockCount: { increment: 1 }
         }
       });
@@ -108,6 +141,7 @@ export class SessionRepository {
       session.status = RaceSessionStatus.LOCKED;
       session.lockReason = reason;
       session.lockedAt = new Date();
+      session.revision += 1;
       session.lockCount += 1;
       session.updatedAt = new Date();
       return session;
@@ -123,6 +157,7 @@ export class SessionRepository {
         data: {
           status: RaceSessionStatus.ACTIVE,
           lockReason: null,
+          revision: { increment: 1 },
           resumedAt: new Date()
         }
       });
@@ -131,9 +166,43 @@ export class SessionRepository {
       const session = await this.findOrCreate(userId, contestId);
       session.status = RaceSessionStatus.ACTIVE;
       session.lockReason = null;
+      session.revision += 1;
       session.resumedAt = new Date();
       session.updatedAt = new Date();
       return session;
     }
+  }
+
+  static async authorizeResumeById(sessionId: string): Promise<Session | null> {
+    try {
+      const updated = await prisma.session.update({
+        where: { id: sessionId },
+        data: {
+          status: RaceSessionStatus.ACTIVE,
+          lockReason: null,
+          revision: { increment: 1 },
+          resumedAt: new Date()
+        }
+      });
+      return updated;
+    } catch {
+      const session = await this.findById(sessionId);
+      if (!session) return null;
+      session.status = RaceSessionStatus.ACTIVE;
+      session.lockReason = null;
+      session.revision += 1;
+      session.resumedAt = new Date();
+      session.updatedAt = new Date();
+      return session;
+    }
+  }
+
+  static getPolicy(status: RaceSessionStatus) {
+    const isLocked = status === RaceSessionStatus.LOCKED || status === RaceSessionStatus.LOCK_PENDING;
+    return {
+      allowExecution: !isLocked,
+      allowEditing: !isLocked,
+      allowNavigation: !isLocked
+    };
   }
 }

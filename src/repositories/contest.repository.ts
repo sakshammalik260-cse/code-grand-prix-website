@@ -10,6 +10,7 @@ const defaultContest: Contest = {
   id: env.CONTEST_ID,
   title: "Code Grand Prix 2026",
   status: env.CONTEST_STATUS as ContestStatus,
+  resultsVisible: true,
   startsAt: new Date(env.CONTEST_START_TIME),
   endsAt: new Date(env.CONTEST_END_TIME),
   createdAt: new Date(),

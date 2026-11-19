@@ -9,38 +9,60 @@ export const SEED_DATA = {
     id: "cgp_2026",
     title: "Code Grand Prix 2026",
     status: ContestStatus.LIVE,
+    resultsVisible: true,
     startsAt: new Date(Date.now() - 30 * 60 * 1000), // Started 30 mins ago
     endsAt: new Date(Date.now() + 90 * 60 * 1000) // Ends in 90 mins
   },
   users: [
+    // Frontend demo accounts matching Saksham's mock
+    {
+      driverId: "CGP2026",
+      password: "Race2026!",
+      displayName: "Demo Driver",
+      team: "CPC / Preview grid",
+      role: Role.CANDIDATE
+    },
+    {
+      driverId: "VOLUNTEER2026",
+      password: "Marshal2026!",
+      displayName: "Demo Marshal",
+      team: "CPC / Race control",
+      role: Role.VOLUNTEER
+    },
+    {
+      driverId: "ADMIN2026",
+      password: "Control2026!",
+      displayName: "Demo Organizer",
+      team: "CPC / Administration",
+      role: Role.ADMIN
+    },
+    // Standard driver accounts
     {
       driverId: "CGP_045",
       password: "driver123",
       displayName: "Lewis Hamilton",
-      role: Role.PARTICIPANT
+      team: "Mercedes AMG",
+      role: Role.CANDIDATE
     },
     {
       driverId: "CGP_016",
       password: "driver123",
       displayName: "Charles Leclerc",
-      role: Role.PARTICIPANT
+      team: "Scuderia Ferrari",
+      role: Role.CANDIDATE
     },
     {
       driverId: "CGP_001",
       password: "driver123",
       displayName: "Max Verstappen",
-      role: Role.PARTICIPANT
+      team: "Red Bull Racing",
+      role: Role.CANDIDATE
     },
     {
       driverId: "VOL_RACE_CONTROL",
       password: "racecontrol2026",
       displayName: "Race Director Charlie",
-      role: Role.VOLUNTEER
-    },
-    {
-      driverId: "VOL_STEWARD_01",
-      password: "steward2026",
-      displayName: "FIA Steward Alpha",
+      team: "FIA Race Control",
       role: Role.VOLUNTEER
     }
   ],
@@ -51,6 +73,7 @@ export const SEED_DATA = {
       difficulty: Difficulty.EASY,
       points: 100,
       order: 1,
+      revision: 1,
       timeLimitMs: 1000,
       memoryLimitMb: 256,
       allowedLanguages: ["python", "javascript", "cpp", "java"],
@@ -68,6 +91,14 @@ Given a speed limit $S$ (in km/h) and a series of $N$ recorded velocities from s
       inputFormat: "N S\\nv1 v2 ... vN",
       outputFormat: "violations maxSpeed",
       constraints: "1 <= N <= 10^5\n50 <= S <= 400\n0 <= vi <= 450",
+      hints: [
+        {
+          id: "hint-speed-1",
+          order: 1,
+          deductionPoints: 10,
+          content: "Iterate through speeds and compare each speed strictly greater than S while keeping track of the running maximum."
+        }
+      ],
       testCases: [
         {
           input: "5 320\n310 325 330 315 340",
@@ -99,6 +130,7 @@ Given a speed limit $S$ (in km/h) and a series of $N$ recorded velocities from s
       difficulty: Difficulty.MEDIUM,
       points: 250,
       order: 2,
+      revision: 1,
       timeLimitMs: 2000,
       memoryLimitMb: 256,
       allowedLanguages: ["python", "javascript", "cpp", "java"],
@@ -120,6 +152,14 @@ Calculate the minimum total race time achievable with at most one pit stop.
       inputFormat: "N P D\\nt1 t2 ... tN",
       outputFormat: "minTotalTime",
       constraints: "1 <= N <= 10^5\n1 <= P <= 10^4\n1 <= D <= 50",
+      hints: [
+        {
+          id: "hint-pit-1",
+          order: 1,
+          deductionPoints: 25,
+          content: "Calculate the base sum first, then evaluate the net savings for each possible pit lap k."
+        }
+      ],
       testCases: [
         {
           input: "5 20 5\n90 92 95 98 100",
@@ -151,6 +191,7 @@ Calculate the minimum total race time achievable with at most one pit stop.
       difficulty: Difficulty.HARD,
       points: 500,
       order: 3,
+      revision: 1,
       timeLimitMs: 3000,
       memoryLimitMb: 512,
       allowedLanguages: ["python", "javascript", "cpp", "java"],
@@ -169,6 +210,7 @@ Find the path that maximizes the total grip collected.
       inputFormat: "R C\\nRow 1\\n...\\nRow R",
       outputFormat: "maxGrip",
       constraints: "1 <= R, C <= 1000\n0 <= G(r, c) <= 1000",
+      hints: [],
       testCases: [
         {
           input: "3 3\n1 3 1\n1 5 1\n4 2 1",

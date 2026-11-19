@@ -12,8 +12,18 @@ import { UserRepository } from "../repositories/user.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { ContestRepository } from "../repositories/contest.repository.js";
 import { TokenRepository } from "../repositories/token.repository.js";
+import { Role } from "@prisma/client";
 
 export class AuthService {
+  /**
+   * Helper to normalize roles to frontend Driver type: 'CANDIDATE' | 'VOLUNTEER' | 'ADMIN'
+   */
+  private static normalizeRole(role: Role): "CANDIDATE" | "VOLUNTEER" | "ADMIN" {
+    if (role === Role.ADMIN) return "ADMIN";
+    if (role === Role.VOLUNTEER) return "VOLUNTEER";
+    return "CANDIDATE";
+  }
+
   /**
    * Authenticate user by driverId and password
    */
@@ -36,12 +46,10 @@ export class AuthService {
       );
     }
 
-    // Get current contest and session
     const contest = await ContestRepository.getContest(env.CONTEST_ID);
     const timeDetails = ContestRepository.calculateTimeDetails(contest);
     const session = await SessionRepository.findOrCreate(user.id, contest.id);
 
-    // Generate JWT token with unique jti identifier
     const jti = uuidv4();
     const token = jwt.sign(
       {
@@ -55,13 +63,22 @@ export class AuthService {
       { expiresIn: "8h" }
     );
 
+    const normalizedRole = this.normalizeRole(user.role);
+
     return {
       token,
+      // Frontend Driver contract fields: id, name, team, role
+      id: user.driverId,
+      name: user.displayName,
+      team: user.team || "CPC Grid",
+      role: normalizedRole,
+      // Standard backend metadata
       user: {
         id: user.id,
         driverId: user.driverId,
         displayName: user.displayName,
-        role: user.role.toLowerCase()
+        team: user.team || "CPC Grid",
+        role: normalizedRole
       },
       contest: {
         id: contest.id,
@@ -77,7 +94,7 @@ export class AuthService {
   }
 
   /**
-   * Get authenticated user profile
+   * Get authenticated user profile (matches frontend Driver type)
    */
   static async getMe(userId: string) {
     const user = await UserRepository.findById(userId);
@@ -85,11 +102,15 @@ export class AuthService {
       throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, "User profile not found.");
     }
 
+    const normalizedRole = this.normalizeRole(user.role);
+
     return {
-      id: user.id,
+      id: user.driverId,
+      name: user.displayName,
       displayName: user.displayName,
       driverId: user.driverId,
-      role: user.role.toLowerCase(),
+      team: user.team || "CPC Grid",
+      role: normalizedRole,
       contestId: env.CONTEST_ID
     };
   }
@@ -98,7 +119,6 @@ export class AuthService {
    * Invalidate authenticated session and token
    */
   static async logout(token: string, userId: string) {
-    // Revoke token until 8 hours from now
     const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
     await TokenRepository.revokeToken(token, expiresAt);
     await UserRepository.updateLastLogout(userId, new Date());

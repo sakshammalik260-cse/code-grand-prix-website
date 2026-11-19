@@ -11,7 +11,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "test": "tsx tests/run-tests.ts"
+    "test": "tsx tests/run-all.ts"
   },
   "keywords": [
     "competitive-programming",

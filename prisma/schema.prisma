@@ -16,15 +16,20 @@ datasource db {
 // ------------------------------------------------------------------------------
 
 enum Role {
+  CANDIDATE
   PARTICIPANT
   VOLUNTEER
+  ADMIN
 }
 
 enum ContestStatus {
   UPCOMING
+  WAITING
   LIVE
   PAUSED
+  PAUSED_BY_ORGANIZER
   ENDED
+  FINISHED
 }
 
 enum CheckinStatus {
@@ -37,7 +42,10 @@ enum CheckinStatus {
 enum RaceSessionStatus {
   WAITING
   ACTIVE
+  LOCK_PENDING
   LOCKED
+  UNDER_REVIEW
+  RESUME_AUTHORIZED
   FINISHED
 }
 
@@ -49,6 +57,7 @@ enum Difficulty {
 
 enum ProblemStatus {
   DRAFT
+  SCHEDULED
   PUBLISHED
   HIDDEN
 }
@@ -75,7 +84,9 @@ enum Verdict {
 enum IncidentType {
   TAB_HIDDEN
   WINDOW_BLUR
+  WINDOW_FOCUS_LOST
   FULLSCREEN_EXIT
+  CAMERA_INTERRUPTED
   CAMERA_TRACK_ENDED
   CAMERA_PERMISSION_DENIED
   NETWORK_RECONNECT
@@ -89,6 +100,7 @@ enum IncidentAction {
 enum IncidentStatus {
   OPEN
   RESOLVED
+  AUTHORIZED
   DISMISSED
 }
 
@@ -98,10 +110,11 @@ enum IncidentStatus {
 
 model User {
   id           String      @id @default(uuid())
-  driverId     String      @unique // e.g. CGP_001, VOL_001
+  driverId     String      @unique // e.g. CGP_045, VOL_RACE_CONTROL, ADMIN_01
   passwordHash String
   displayName  String
-  role         Role        @default(PARTICIPANT)
+  team         String?     @default("CPC Grid")
+  role         Role        @default(CANDIDATE)
   lastLogoutAt DateTime?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
@@ -111,21 +124,24 @@ model User {
   incidents    Incident[]  @relation("ParticipantIncidents")
   auditLogs    AuditLog[]  @relation("VolunteerAuditLogs")
   drafts       Draft[]
+  hintReceipts HintReceipt[]
 
   @@map("users")
 }
 
 model Contest {
-  id          String        @id // e.g. "cgp_2026"
-  title       String
-  status      ContestStatus @default(LIVE)
-  startsAt    DateTime
-  endsAt      DateTime
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id             String        @id // e.g. "cgp_2026"
+  title          String
+  status         ContestStatus @default(LIVE)
+  resultsVisible Boolean       @default(true)
+  startsAt       DateTime
+  endsAt         DateTime
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  sessions    Session[]
-  problems    Problem[]
+  sessions       Session[]
+  problems       Problem[]
+  hintReceipts   HintReceipt[]
 
   @@map("contests")
 }
@@ -135,6 +151,7 @@ model Session {
   userId              String
   contestId           String
   status              RaceSessionStatus @default(WAITING)
+  revision            Int               @default(1)
   checkinStatus       CheckinStatus     @default(NOT_STARTED)
   rulesAccepted       Boolean           @default(false)
   cameraPermission    Boolean           @default(false)
@@ -157,28 +174,33 @@ model Session {
 }
 
 model Problem {
-  id               String        @id @default(uuid())
-  contestId        String
-  slug             String        @unique
-  title            String
-  difficulty       Difficulty
-  points           Int           // 100 (Easy), 250 (Medium), 500 (Hard)
-  order            Int           @default(1)
-  status           ProblemStatus @default(PUBLISHED)
-  statement        String        @db.Text
-  inputFormat      String        @db.Text
-  outputFormat     String        @db.Text
-  constraints      String        @db.Text
-  timeLimitMs      Int           @default(2000)
-  memoryLimitMb    Int           @default(256)
-  allowedLanguages String[]      @default(["python", "javascript", "cpp", "java"])
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                     String        @id @default(uuid())
+  contestId              String
+  slug                   String        @unique
+  title                  String
+  difficulty             Difficulty
+  points                 Int           // 100, 250, 500
+  order                  Int           @default(1)
+  revision               Int           @default(1)
+  status                 ProblemStatus @default(PUBLISHED)
+  statement              String        @db.Text
+  inputFormat            String        @db.Text
+  outputFormat           String        @db.Text
+  constraints            String        @db.Text
+  timeLimitMs            Int           @default(2000)
+  memoryLimitMb          Int           @default(256)
+  allowedLanguages       String[]      @default(["python", "javascript", "cpp", "java"])
+  expectedTimeComplexity String?       @default("O(n)")
+  expectedSpaceComplexity String?      @default("O(1)")
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
-  contest          Contest       @relation(fields: [contestId], references: [id], onDelete: Cascade)
-  testCases        TestCase[]
-  submissions      Submission[]
-  drafts           Draft[]
+  contest                Contest       @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  testCases              TestCase[]
+  submissions            Submission[]
+  drafts                 Draft[]
+  hints                  Hint[]
+  hintReceipts           HintReceipt[]
 
   @@map("problems")
 }
@@ -190,12 +212,47 @@ model TestCase {
   expectedOutput String   @db.Text
   isPublic       Boolean  @default(false) // Public sample test vs Hidden private test
   explanation    String?  @db.Text
+  weight         Int?     @default(1)
   order          Int      @default(1)
   createdAt      DateTime @default(now())
 
   problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   @@map("test_cases")
+}
+
+model Hint {
+  id              String        @id @default(uuid())
+  problemId       String
+  order           Int           @default(1)
+  deductionPoints Int           @default(10) // Points subtracted from problem score
+  content         String        @db.Text
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  problem         Problem       @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  receipts        HintReceipt[]
+
+  @@map("hints")
+}
+
+model HintReceipt {
+  id               String   @id @default(uuid())
+  operationId      String   @unique
+  contestId        String
+  userId           String
+  problemId        String
+  hintId           String
+  deductionApplied Int
+  createdAt        DateTime @default(now())
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contest          Contest  @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  problem          Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  hint             Hint     @relation(fields: [hintId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, userId, problemId, hintId])
+  @@map("hint_receipts")
 }
 
 model Submission {
@@ -224,12 +281,14 @@ model Submission {
 
 model Incident {
   id               String         @id @default(uuid())
-  eventId          String         @unique
+  eventId          String         @unique // clientEventId
   userId           String
   sessionId        String
+  problemId        String?
   type             IncidentType
   action           IncidentAction
   status           IncidentStatus @default(OPEN)
+  blocking         Boolean        @default(true)
   occurredAt       DateTime
   receivedAt       DateTime       @default(now())
   details          String?        @db.Text
@@ -251,7 +310,8 @@ model AuditLog {
   volunteerId   String
   incidentId    String?
   participantId String?
-  action        String
+  sessionId     String?
+  action        String    // APPROVE_RESUME, BULK_RESUME, KEEP_LOCKED, DISMISS, etc.
   reason        String
   previousState String?   @db.Text
   newState      String?   @db.Text
