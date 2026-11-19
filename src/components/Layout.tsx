@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { ArrowUpRight, Flag, LogOut, Menu, X } from 'lucide-react'
 import { useSession } from '../hooks/useSession'
 import { roleHome } from '../services/access'
+import { event } from '../data/event'
 import { ClubMark, ClubLogo, RaceWordmark } from './RacingIdentity'
 
 export function Brand() {
@@ -31,6 +32,7 @@ export function Layout() {
   const cinematic = ['/', '/login', '/check-in', '/lobby'].includes(pathname)
   const home = pathname === '/'
   const [scrolled, setScrolled] = useState(false)
+  const [activeSection, setActiveSection] = useState(home ? 'home' : '')
   useEffect(() => {
     let frame = 0
     const update = () => { frame = 0; setScrolled(window.scrollY > 24) }
@@ -39,6 +41,27 @@ export function Layout() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(frame) }
   }, [])
+  useEffect(() => {
+    if (!home) return
+    const ids = ['home', 'about', 'schedule', 'rules', 'contact']
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const threshold = (document.querySelector('.site-header')?.getBoundingClientRect().height || 0) + 48
+      let current = 'home'
+      for (const id of ids) {
+        const section = document.getElementById(id)
+        if (section && section.getBoundingClientRect().top <= threshold) current = id
+      }
+      setActiveSection(current)
+    }
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); cancelAnimationFrame(frame) }
+  }, [home])
+  const currentSection = home ? activeSection : ''
   if (pathname === '/arena' || pathname === '/results' || pathname.startsWith('/volunteer') || pathname.startsWith('/admin')) {
     const shell = pathname === '/arena' ? 'arena-route-shell' : `dashboard-route-shell ${pathname.startsWith('/volunteer') ? 'volunteer-route-shell' : ''}`
     return <div className={shell}><ScrollToPage /><a className="skip-link" href={pathname === '/arena' ? '#arena-language' : '#main'}>{pathname === '/arena' ? 'Skip to code editor' : 'Skip to content'}</a><main id="main" tabIndex={-1}><Outlet /></main></div>
@@ -49,14 +72,25 @@ export function Layout() {
       {cinematic ? home ? <ClubMark /> : <Link to="/" className="header-wordmark" aria-label="Code Grand Prix home"><RaceWordmark /></Link> : <Brand />}
       <button className="icon-button mobile-menu" aria-label={open ? 'Close navigation' : 'Open navigation'} aria-expanded={open} aria-controls="main-navigation" onClick={() => setMenuPath(open ? null : pathname)}>{open ? <X /> : <Menu />}</button>
       <nav id="main-navigation" className={open ? 'navigation open' : 'navigation'} aria-label="Main navigation" onClick={() => setMenuPath(null)}>
-        <NavLink to="/#home" end>{cinematic ? 'Home' : 'Overview'}</NavLink><Link to="/#about">{cinematic ? 'About' : 'The race'}</Link><Link to="/#rules">{cinematic ? 'Rules' : 'Rulebook'}</Link>
-        {cinematic && <><Link to="/#schedule">Schedule</Link><Link to="/#contact">Contact</Link></>}
-        <NavLink to="/results">Results</NavLink>
+        <Link to="/#home" className={currentSection === 'home' ? 'active' : undefined} aria-current={currentSection === 'home' ? 'location' : undefined}>{cinematic ? 'Home' : 'Overview'}</Link>
+        <Link to="/#about" className={currentSection === 'about' ? 'active' : undefined} aria-current={currentSection === 'about' ? 'location' : undefined}>{cinematic ? 'About' : 'The race'}</Link>
+        {cinematic && <Link to="/#schedule" className={currentSection === 'schedule' ? 'active' : undefined} aria-current={currentSection === 'schedule' ? 'location' : undefined}>Schedule</Link>}
+        <Link to="/#rules" className={currentSection === 'rules' ? 'active' : undefined} aria-current={currentSection === 'rules' ? 'location' : undefined}>{cinematic ? 'Rules' : 'Rulebook'}</Link>
+        {cinematic && <Link to="/#contact" className={currentSection === 'contact' ? 'active' : undefined} aria-current={currentSection === 'contact' ? 'location' : undefined}>Event desk</Link>}
+        {driver?.role !== 'VOLUNTEER' && <NavLink to="/results">Results</NavLink>}
       </nav>
       <div className="nav-actions">{!cinematic && <span className="season-label"><span className="status-dot" /> RACE WEEK</span>}{driver ? <><Link className="nav-cta" to={roleHome(driver.role)}>{driver.id}<ArrowUpRight size={16} /></Link><button className="icon-button" onClick={signOut} aria-label="Sign out"><LogOut size={17} /></button></> : <Link className="nav-cta" to="/login">Driver login <ArrowUpRight size={16} /></Link>}</div>
     </div></header>
     <main id="main" tabIndex={-1}><Outlet /></main>
-    {(!cinematic || home) && <footer id="contact" className="site-footer"><Link to="/" aria-label="Competitive Programming Club home"><ClubLogo className="cpc-footer-logo"/></Link><p>Built for the thrill of solving.</p><span>© 2026 CPC Club <span className="footer-divider">/</span> Jain (Deemed-to-be) University</span></footer>}
+    {(!cinematic || home) && <footer id="contact" className="site-footer">
+      <div className="footer-main">
+        <Link to="/" aria-label="Competitive Programming Club home"><ClubLogo className="cpc-footer-logo" /></Link>
+        <div className="footer-statement"><span>CODE. COMPILE. CONQUER.</span><p>Built for the thrill of solving and the discipline of competition.</p></div>
+        <div className="footer-event"><span>RACE WEEKEND</span><strong>{event.dateLabel.toUpperCase()}</strong><small>{event.university}<br />Participant support is available from CPC Club volunteers at the event.</small></div>
+        <nav className="footer-navigation" aria-label="Footer navigation"><Link to="/#about">About CPC</Link><Link to="/#schedule">Schedule</Link><Link to="/#rules">Rulebook</Link><Link to="/login">Driver login</Link></nav>
+      </div>
+      <div className="footer-bottom"><span>© 2026 CPC Club <span className="footer-divider">/</span> {event.university}</span><span>YOUR LOGIC. YOUR SPEED. YOUR RACE.</span></div>
+    </footer>}
   </div>
 }
 export function RequireDriver() {

@@ -12,6 +12,7 @@ import { ProblemNavigation } from '../components/arena/ProblemNavigation'
 import { ProblemStatement } from '../components/arena/ProblemStatement'
 import { CodeEditor } from '../components/arena/CodeEditor'
 import { ResultsPanel } from '../components/arena/ResultsPanel'
+import { RaceControlNotifications } from '../components/arena/RaceControlNotifications'
 import type { ResultsTab } from '../components/arena/ResultsPanel'
 const MockArenaControls=import.meta.env.DEV?lazy(()=>import('../components/arena/MockArenaControls').then(module=>({default:module.MockArenaControls}))):null
 import { useSession } from '../hooks/useSession'
@@ -51,6 +52,7 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
   const [noticeError, setNoticeError] = useState('')
   const [detail, setDetail] = useState<{ id: string; problem?: Problem; error?: string } | null>(null)
   const [detailAttempt, setDetailAttempt] = useState(0)
+  const [focusMode, setFocusMode] = useState(false)
   const controllers = useRef(new Set<AbortController>())
   const alive = useRef(true)
   const fullscreen = useFullscreenStatus()
@@ -93,6 +95,16 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
     const timer = window.setInterval(() => { void refreshContest(true) }, 15000)
     return () => window.clearInterval(timer)
   }, [refreshContest])
+  useEffect(() => {
+    const toggleFocus = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === 'KeyF') {
+        event.preventDefault()
+        setFocusMode(current => !current)
+      }
+    }
+    window.addEventListener('keydown', toggleFocus, true)
+    return () => window.removeEventListener('keydown', toggleFocus, true)
+  }, [])
   const refreshProgress = useCallback(async (signal?: AbortSignal) => {
     try {
       const next = await arenaServices.getProgress(contest.id, driverId, signal)
@@ -103,26 +115,26 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
   const selectLanguage = useCallback((id: LanguageId) => setParams(previous => { const next = new URLSearchParams(previous); next.set('lang',id); return next }, { replace: true }), [setParams])
   function retryProblem() { setDetail(null); setDetailAttempt(value => value + 1) }
   function changeMockPhase(phase: ContestPhase) { setContest(mockControls.setContestPhase(phase)); setNoticeError('') }
-  const header = <ArenaHeader contest={{ ...contest, status: clock.effectivePhase }} fullscreen={fullscreen.active} onFullscreen={restoreFullscreen} onRefresh={() => { void refreshContest(); void monitoring.client.refresh() }} refreshing={refreshing} monitoring={<MonitoringStatus camera={monitoring.camera.status} fullscreen={fullscreen.active} session={monitoring.session} connection={monitoring.connection} locked={monitoring.locked} />} />
-  const sidebar = <ProblemNavigation problems={problems} selected={selectedId} progress={progress} busy={busy || monitoring.locked || !!monitoring.session && !monitoring.session.policy.allowNavigation} onSelect={selectProblem} />
+  const header = <ArenaHeader contest={{ ...contest, status: clock.effectivePhase }} fullscreen={fullscreen.active} onFullscreen={restoreFullscreen} onRefresh={() => { void refreshContest(); void monitoring.client.refresh() }} refreshing={refreshing} monitoring={<MonitoringStatus camera={monitoring.camera.status} fullscreen={fullscreen.active} session={monitoring.session} connection={monitoring.connection} locked={monitoring.locked} />} focusMode={focusMode} onFocusMode={() => setFocusMode(current => !current)} />
+  const sidebar = <ProblemNavigation problems={problems} selected={selectedId} progress={progress} busy={busy || monitoring.locked || !!monitoring.session && !monitoring.session.policy.allowNavigation} round={contest.round} onSelect={selectProblem} />
   const phaseText = clock.effectivePhase === 'WAITING' ? 'The race has not started. You can prepare your draft; Run and Submit unlock when race control starts the contest.' : clock.effectivePhase === 'PAUSED_BY_ORGANIZER' ? 'Paused by organizer. Your draft remains editable; Run and Submit are unavailable until the race resumes.' : clock.ended ? 'The chequered flag is out. Submissions are closed; your local drafts remain available.' : !clock.canSubmit ? 'Race timing is unavailable. Refresh race status before submitting.' : ''
   const notice = <>{(!monitoring.authorized || !monitoring.ready) && !overlayVisible && <div className="monitoring-health-banner" role="status"><span>{monitoring.connection !== 'CONNECTED' ? monitoring.error || 'Verifying competition session...' : monitoring.session?.status === 'FINISHED' ? 'The competition session is finished. Execution is closed; your draft remains available.' : !monitoring.ready ? 'Restore camera and fullscreen before executing code. Your draft remains available.' : 'Race-control authorization is required.'}</span>{monitoring.camera.status !== 'ACTIVE' && <button onClick={() => { void monitoring.recoverCamera() }} disabled={monitoring.camera.pending}>{monitoring.camera.pending ? 'Requesting camera...' : 'Restore camera'}</button>}{!fullscreen.active && <button onClick={restoreFullscreen}>Re-enter fullscreen</button>}<button onClick={() => { void monitoring.client.refresh() }}>Refresh session</button>{monitoring.connection === 'AUTH_EXPIRED' && <button onClick={signOut}>Sign in again</button>}</div>}{!permitted.includes(language) && <div className="arena-state-notice state-error" role="status">This language is not permitted. Select an available language; your existing draft remains saved.</div>}{phaseText && <div className={'arena-state-notice state-' + clock.effectivePhase.toLowerCase()} role="status"><CircleHelp size={14} /><span>{phaseText}</span></div>}{(noticeError || fullscreen.error) && <div className="arena-state-notice state-error" role="alert"><AlertCircle size={14} /><span>{noticeError || fullscreen.error}</span><button onClick={() => { if (noticeError) void refreshContest().then(() => refreshProgress()); else void fullscreen.activate() }}>Retry</button></div>}</>
   const mockControlsUi = import.meta.env.DEV && isArenaMockMode && MockArenaControls ? <Suspense fallback={null}><MockArenaControls busy={busy} onPhase={changeMockPhase} onExpiry={() => setContest(mockControls.finishInFiveSeconds())} /></Suspense> : null
-  if (!summary) return decorate(<ArenaWorkspace topBar={header} problemNavigation={sidebar} problemStatement={<div className="arena-inline-error"><AlertCircle size={28} /><h2>Problem not found</h2><p>{problems.length ? 'Choose a valid problem from the left sidebar.' : 'No problems have been released for this contest.'}</p>{problems[0] && <button className="arena-quiet-button" onClick={() => selectProblem(problems[0].id)}>Open first problem</button>}</div>} editor={<div className="arena-pane-loading"><FileCode2 size={27} /><p>Select a problem to restore its draft.</p></div>} editorActions={null} results={null} notice={notice} statusBar={<ArenaStatusBar simulation={contest.simulation} controls={mockControlsUi} />} />)
+  if (!summary) return decorate(<ArenaWorkspace focusMode={focusMode} topBar={header} problemNavigation={sidebar} problemStatement={<div className="arena-inline-error"><AlertCircle size={28} /><h2>Problem not found</h2><p>{problems.length ? 'Choose a valid problem from the left sidebar.' : 'No problems have been released for this contest.'}</p>{problems[0] && <button className="arena-quiet-button" onClick={() => selectProblem(problems[0].id)}>Open first problem</button>}</div>} editor={<div className="arena-pane-loading"><FileCode2 size={27} /><p>Select a problem to restore its draft.</p></div>} editorActions={null} results={null} notice={notice} statusBar={<ArenaStatusBar simulation={contest.simulation} controls={mockControlsUi} />} />)
   const problem = detail?.id === selectedId ? detail.problem || null : null
   const problemError = detail?.id === selectedId ? detail.error || '' : ''
-  return decorate(<ArenaDocument key={`${contest.id}:${driverId}:${selectedId}:${language}`} contest={contest} driverId={driverId} problemId={selectedId} language={language} problem={problem} problemError={problemError} onRetryProblem={retryProblem} onLanguage={selectLanguage} referenceAllowed={monitoring.authorized && monitoring.ready && !editingLocked && !clock.ended} sessionId={monitoring.session?.id || ''} editingLocked={editingLocked} canAct={clock.canSubmit && !!problem && problem.allowedLanguages.includes(language) && monitoring.authorized && monitoring.ready && !monitoring.locked} onBusyChange={setBusy} onProgress={refreshProgress} header={header} sidebar={sidebar} notice={notice} mockControlsUi={mockControlsUi} />)
+  return decorate(<ArenaDocument key={`${contest.id}:${driverId}:${selectedId}:${language}`} contest={contest} driverId={driverId} problemId={selectedId} language={language} problem={problem} problemError={problemError} onRetryProblem={retryProblem} onLanguage={selectLanguage} referenceAllowed={monitoring.authorized && monitoring.ready && !editingLocked && !clock.ended} sessionId={monitoring.session?.id || ''} editingLocked={editingLocked} canAct={clock.canSubmit && !!problem && problem.allowedLanguages.includes(language) && monitoring.authorized && monitoring.ready && !monitoring.locked} onBusyChange={setBusy} onProgress={refreshProgress} header={header} sidebar={sidebar} notice={notice} mockControlsUi={mockControlsUi} focusMode={focusMode} />)
 }
 function ArenaStatusBar({ simulation, controls }: { simulation: boolean; controls: ReactNode }) {
-  return <footer className="arena-status-bar"><Link to="/lobby"><ArrowLeft size={11} />Lobby</Link><span><span className="arena-status-led" />{simulation ? 'Simulation workspace · No code is executed' : 'Connected to judging service'}</span><span className="arena-keyboard-hints">Ctrl/Cmd + Enter <b>Run</b><i />Ctrl/Cmd + Shift + Enter <b>Submit</b></span>{controls}</footer>
+  return <footer className="arena-status-bar"><Link to="/lobby"><ArrowLeft size={11} />Lobby</Link><span><span className="arena-status-led" />{simulation ? 'Simulation workspace · No code is executed' : 'Connected to judging service'}</span><span className="arena-keyboard-hints">Ctrl/Cmd + Enter <b>Run</b><i />Ctrl/Cmd + Shift + Enter <b>Submit</b><i />Ctrl/Cmd + Shift + F <b>Focus</b></span>{controls}</footer>
 }
 interface DocumentProps {
   referenceAllowed:boolean; sessionId: string; editingLocked: boolean; contest: ContestState; driverId: string; problemId: string; language: LanguageId; problem: Problem | null; problemError: string
   onRetryProblem: () => void; onLanguage: (language: LanguageId) => void; canAct: boolean
   onBusyChange: (busy: boolean) => void; onProgress: (signal?: AbortSignal) => Promise<void>
-  header: ReactNode; sidebar: ReactNode; notice: ReactNode; mockControlsUi: ReactNode
+  header: ReactNode; sidebar: ReactNode; notice: ReactNode; mockControlsUi: ReactNode; focusMode: boolean
 }
-function ArenaDocument({ referenceAllowed, sessionId, editingLocked, contest, driverId, problemId, language, problem, problemError, onRetryProblem, onLanguage, canAct, onBusyChange, onProgress, header, sidebar, notice, mockControlsUi }: DocumentProps) {
+function ArenaDocument({ referenceAllowed, sessionId, editingLocked, contest, driverId, problemId, language, problem, problemError, onRetryProblem, onLanguage, canAct, onBusyChange, onProgress, header, sidebar, notice, mockControlsUi, focusMode }: DocumentProps) {
   const draft = useDraft({ contestId: contest.id, driverId, problemId, language }, starterCode[language])
   const [customInput, setCustomInput] = useState('')
   const [inputMode, setInputMode] = useState<'samples' | 'custom'>('samples')
@@ -138,7 +150,9 @@ function ArenaDocument({ referenceAllowed, sessionId, editingLocked, contest, dr
   const result = execution.lastAction === 'submit' ? execution.submission?.execution || null : execution.runResult
   function changeTab(next: ResultsTab) { setTab(next); if (next === 'samples' || next === 'custom') setInputMode(next) }
   const penaltyChanged=useCallback(()=>{void onProgress()},[onProgress])
-  const mobileNavigation = <div className="arena-mobile-navigation" aria-label="Workspace panels">{(['statement','code','results'] as const).map(view => <button key={view} aria-pressed={mobileView === view} onClick={() => setMobileView(view)}>{view === 'statement' ? 'Problem' : view === 'code' ? 'Code editor' : 'Results'}</button>)}</div>
+  const mobileNavigation = <>
+    <RaceControlNotifications operation={execution.operation} runResult={execution.runResult} submission={execution.submission} error={execution.error} />
+    <div className={`arena-mobile-navigation ${focusMode ? 'is-focus-mode' : ''}`} aria-label="Workspace panels">{(['statement','code','results'] as const).map(view => <button key={view} aria-pressed={mobileView === view} onClick={() => setMobileView(view)}>{view === 'statement' ? 'Problem' : view === 'code' ? 'Code editor' : 'Results'}</button>)}</div>
+  </>
   return <ArenaWorkspace topBar={header} problemNavigation={sidebar} problemStatement={<><ProblemStatement problem={problem} error={problemError} onRetry={onRetryProblem} />{problem&&<RaceAssist key={problemId} problemId={problemId} sessionId={sessionId} allowed={canAct} onPenalty={penaltyChanged}/>}</>} editor={<CodeEditor allowedLanguages={problem?.allowedLanguages || []} readOnly={editingLocked} language={language} code={draft.code} onChange={draft.update} onLanguage={onLanguage} saveStatus={draft.status} onSave={save} busy={!!execution.operation} onRun={run} onSubmit={submit} />} editorActions={<><SyntaxGuide language={language} allowed={referenceAllowed}/><button className="arena-input-selector" onClick={() => { setTab(inputMode === 'custom' ? 'custom' : 'samples'); setMobileView('results') }}><FlaskConical size={12} /><span>{inputMode === 'custom' ? 'Custom input' : 'Public samples'}</span></button><span className="arena-action-spacer" /><button className="arena-run-button" onClick={run} disabled={!canAct || !!execution.operation} title="Run Code (Ctrl/Cmd+Enter)">{execution.operation === 'run' ? <LoaderCircle size={14} className="spin" /> : <Play size={13} />}Run Code</button><button className="arena-submit-button" onClick={submit} disabled={!canAct || !!execution.operation} title="Submit Code (Ctrl/Cmd+Shift+Enter)">{execution.operation === 'submit' ? <LoaderCircle size={14} className="spin" /> : <Send size={13} />}Submit Code</button></>} results={<ResultsPanel problem={problem} tab={tab} onTab={changeTab} customInput={customInput} onCustomInput={setCustomInput} execution={result} submission={execution.submission} history={execution.history} operation={execution.operation} submitting={execution.submitting} error={execution.error} lastAction={execution.lastAction} onRun={run} onCheckResult={execution.checkResult} canRun={canAct} simulation={contest.simulation} />} notice={notice} mobileNavigation={mobileNavigation} mobileView={mobileView} statusBar={<ArenaStatusBar simulation={contest.simulation} controls={mockControlsUi} />} />
 }
-

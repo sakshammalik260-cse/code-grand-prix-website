@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, UserRound } from 'lucide-react'
@@ -20,16 +20,23 @@ export function LoginPage() {
   const [errors, setErrors] = useState<{ driverId?: string; password?: string }>({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const driverIdInput = useRef<HTMLInputElement>(null)
+  const passwordInput = useRef<HTMLInputElement>(null)
+  const [postLoginTarget, setPostLoginTarget] = useState('')
   if(authLoading)return <div className="arena-load-screen" role="status">Verifying your account...</div>
-  if (driver) return <Navigate to={roleHome(driver.role)} replace />
+  if (driver) return <Navigate to={postLoginTarget || roleHome(driver.role)} replace />
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const next = { driverId: !driverId.trim() ? 'Enter your Driver ID.' : undefined, password: !password ? 'Enter your password.' : undefined }
     setErrors(next)
     setError('')
-    if (next.driverId || next.password) return
+    if (next.driverId || next.password) {
+      if (next.driverId) driverIdInput.current?.focus()
+      else passwordInput.current?.focus()
+      return
+    }
     setLoading(true)
-    try { const account=await authService.login({ driverId, password }); signIn(account); const from=(location.state as {from?:string})?.from; const allowed=account.role==='ADMIN'?from?.startsWith('/admin') || from?.startsWith('/volunteer'):account.role==='VOLUNTEER'?from?.startsWith('/volunteer'):from?.startsWith('/check-in'); navigate(allowed && from?from:roleHome(account.role), { replace: true }) }
+    try { const account=await authService.login({ driverId, password }); const from=(location.state as {from?:string})?.from; const allowed=account.role==='ADMIN'?from?.startsWith('/admin') || from?.startsWith('/volunteer') || from==='/results':account.role==='VOLUNTEER'?from?.startsWith('/volunteer'):from?.startsWith('/check-in') || from==='/results'; const target=allowed && from?from:roleHome(account.role); setPostLoginTarget(target); signIn(account); navigate(target, { replace: true }) }
     catch (err) { setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.') }
     finally { setLoading(false) }
   }
@@ -40,16 +47,18 @@ export function LoginPage() {
     <div className="driver-login-layout">
       <section className="driver-login-panel" aria-labelledby="driver-login-title">
         <RaceWordmark className="login-wordmark" />
+        <div className="login-access-strip"><span><i /> DRIVER IDENTIFICATION</span><strong>ROUND 01</strong></div>
         <h1 id="driver-login-title">DRIVER LOGIN</h1>
         <form onSubmit={submit} noValidate className="login-form">
-          <label className="sr-only" htmlFor="driver-id">Driver ID</label>
-          <div className={`input-wrap ${errors.driverId ? 'invalid' : ''}`}><UserRound size={19} fill="currentColor" /><input id="driver-id" autoComplete="username" autoCapitalize="characters" spellCheck={false} placeholder="Driver ID" maxLength={40} value={driverId} onChange={e => setDriverId(e.target.value)} aria-invalid={!!errors.driverId} aria-describedby={errors.driverId ? 'driver-error' : undefined} disabled={loading} /></div>
+          <label className="login-field-label" htmlFor="driver-id"><span>Driver ID</span><small>Assigned credential</small></label>
+          <div className={`input-wrap ${errors.driverId ? 'invalid' : ''}`}><UserRound size={19} fill="currentColor" /><input ref={driverIdInput} id="driver-id" autoComplete="username" autoCapitalize="characters" spellCheck={false} placeholder="Enter driver ID" maxLength={40} value={driverId} onChange={e => { setDriverId(e.target.value); if (errors.driverId) setErrors(current => ({ ...current, driverId: undefined })); if (error) setError('') }} aria-invalid={!!errors.driverId} aria-describedby={errors.driverId ? 'driver-error' : undefined} disabled={loading} /></div>
           {errors.driverId && <span className="field-error" id="driver-error">{errors.driverId}</span>}
-          <label className="sr-only" htmlFor="password">Password</label>
-          <div className={`input-wrap ${errors.password ? 'invalid' : ''}`}><LockKeyhole size={18} fill="currentColor" /><input id="password" type={visible ? 'text' : 'password'} autoComplete="current-password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} disabled={loading} /><button className="icon-button" type="button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
+          <label className="login-field-label" htmlFor="password"><span>Password</span><small>Cockpit access</small></label>
+          <div className={`input-wrap ${errors.password ? 'invalid' : ''}`}><LockKeyhole size={18} fill="currentColor" /><input ref={passwordInput} id="password" type={visible ? 'text' : 'password'} autoComplete="current-password" placeholder="Enter password" value={password} onChange={e => { setPassword(e.target.value); if (errors.password) setErrors(current => ({ ...current, password: undefined })); if (error) setError('') }} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-error' : undefined} disabled={loading} /><button className="icon-button" type="button" onClick={() => setVisible(!visible)} aria-label={visible ? 'Hide password' : 'Show password'} aria-pressed={visible}>{visible ? <EyeOff size={18} /> : <Eye size={18} />}</button></div>
           {errors.password && <span className="field-error" id="password-error">{errors.password}</span>}
           {error && <p className="alert alert-error" role="alert">{error}</p>}
-          <button type="submit" className="button button-primary racing-button w-full" disabled={loading}><span>{loading ? <><LoaderCircle size={17} className="spin" /> CHECKING CREDENTIALS</> : <>ENTER THE GRID <ArrowRight size={19} /></>}</span></button>
+          <p className="login-form-status" role="status"><i />{loading ? 'VERIFYING DRIVER CREDENTIALS' : 'PADDOCK ACCESS READY'}</p>
+          <button type="submit" className="button button-primary racing-button w-full" disabled={loading} aria-busy={loading}><span>{loading ? <><LoaderCircle size={17} className="spin" /> CHECKING CREDENTIALS</> : <>ENTER THE GRID <ArrowRight size={19} /></>}</span></button>
         </form>
         <p className="login-signature">Competitive Programming Club <span>|</span> Code Grand Prix</p>
         {isDevelopmentMock && DevelopmentAccounts && <Suspense fallback={null}><DevelopmentAccounts onSelect={(id,secret)=>{setDriverId(id);setPassword(secret);setErrors({});setError('')}}/></Suspense>}

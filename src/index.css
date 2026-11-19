@@ -8,12 +8,13 @@
 @import './styles/admin.css';
 @import './styles/phase-4-1.css';
 @import './styles/phase-4-2.css';
+@import './styles/experience-2026.css';
 
 @theme {
-  --color-racing-red: #e10600;
-  --color-carbon: #0b0b0f;
-  --color-surface: #17171d;
-  --color-race-white: #f5f5f5;
-  --color-success: #00d084;
-  --color-warning: #ffcc00;
+  --color-racing-red: #f20d18;
+  --color-carbon: #090a0d;
+  --color-surface: #171a21;
+  --color-race-white: #f5f5f7;
+  --color-success: #36d9a0;
+  --color-warning: #ffbd4a;
 }

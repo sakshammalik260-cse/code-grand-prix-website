@@ -13,8 +13,9 @@ export interface ArenaWorkspaceProps {
   notice?: ReactNode
   statusBar?: ReactNode
   mobileView?: 'statement' | 'code' | 'results'
+  focusMode?: boolean
 }
-export function ArenaWorkspace({ topBar, problemNavigation, problemStatement, editor, editorActions, results, mobileNavigation, notice, statusBar, mobileView = 'code' }: ArenaWorkspaceProps) {
+export function ArenaWorkspace({ topBar, problemNavigation, problemStatement, editor, editorActions, results, mobileNavigation, notice, statusBar, mobileView = 'code', focusMode = false }: ArenaWorkspaceProps) {
   const [height, setHeight] = useState(() => Math.min(280, Math.max(180, window.innerHeight * .3)))
   const drag = useRef<{ y: number; height: number } | null>(null)
   function resize(event: PointerEvent<HTMLDivElement>) {
@@ -26,12 +27,12 @@ export function ArenaWorkspace({ topBar, problemNavigation, problemStatement, ed
       setHeight(current => Math.max(130, Math.min(window.innerHeight * .42, current + (event.key === 'ArrowUp' ? 20 : -20))))
     }
   }
-  return <div className="arena-workspace" data-mobile-view={mobileView} style={{ '--arena-results-height': `${height}px` } as CSSProperties}>
-    <header className="arena-topbar">{topBar}</header>
+  return <div className="arena-workspace" data-mobile-view={mobileView} data-focus-mode={focusMode} style={{ '--arena-results-height': `${height}px` } as CSSProperties}>
+    {topBar}
     {mobileNavigation}
     {notice}
     <div className="arena-panes">
-      <nav className="arena-problem-navigation" aria-label="Problems">{problemNavigation}</nav>
+      {problemNavigation}
       <section className="arena-problem-statement" aria-label="Problem statement">{problemStatement}</section>
       <section className="arena-editor-column" aria-label="Coding workspace">
         <div className="arena-editor">{editor}</div>
