@@ -11,17 +11,6 @@ export class ContestService {
    */
   static async getContestClock(contestId: string = env.CONTEST_ID) {
     const contest = await ContestRepository.getContest(contestId);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
-
-    return {
-      id: contest.id,
-      title: contest.title,
-      status: timeDetails.status,
-      startsAt: timeDetails.startsAt,
-      endsAt: timeDetails.endsAt,
-      serverTime: timeDetails.serverTime,
-      remainingMs: timeDetails.remainingMs,
-      timerPolicy: timeDetails.timerPolicy
-    };
+    return ContestRepository.calculateTimeDetails(contest);
   }
 }

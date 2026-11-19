@@ -127,4 +127,19 @@ export class SubmissionRepository {
       (s) => s.userId === userId && s.verdict === Verdict.ACCEPTED
     );
   }
+
+  static async findAllByUser(userId: string): Promise<Submission[]> {
+    try {
+      const submissions = await prisma.submission.findMany({
+        where: { userId }
+      });
+      if (submissions && submissions.length > 0) return submissions;
+    } catch {
+      // Fallback
+    }
+
+    return Array.from(inMemorySubmissions.values()).filter(
+      (s) => s.userId === userId
+    );
+  }
 }

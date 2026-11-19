@@ -13,6 +13,10 @@ import { Role } from "@prisma/client";
 
 let isResultsVisible = true;
 
+function normalizeProblemId(id: string): string {
+  return id ? id.replace(/^prob_/, "").toLowerCase() : "";
+}
+
 export class LeaderboardService {
   static getVisibility() {
     return { visible: isResultsVisible };
@@ -56,15 +60,35 @@ export class LeaderboardService {
     for (const p of participants) {
       const session = await SessionRepository.findOrCreate(p.id, contest.id);
       const solvedSubmissions = await SubmissionRepository.findAllSolvedByUser(p.id);
+      const userReceipts = await HintRepository.getUserHintReceipts(p.id, contest.id);
 
-      // Unique solved problem IDs
-      const solvedProblemIds = new Set(solvedSubmissions.map((s) => s.problemId));
-      const problemsSolved = solvedProblemIds.size;
+      let totalScore = 0;
+      let problemsSolved = 0;
+      const totalHintPenalties = userReceipts.reduce((sum, r) => sum + r.deductionApplied, 0);
 
-      const rawScore = solvedSubmissions.reduce((sum, s) => sum + s.score, 0);
-      const totalHintPenalties = await HintRepository.getTotalHintPenaltiesForUser(p.id, contest.id);
+      // C12: Count each problem at most once (no duplicate point multiplication)
+      // C13: Deduct hint penalties per-solved-problem: awarded = max(0, points - problemHintDeductions).
+      // Unsolved problems award 0 and their hint penalties do not deduct from other solved problems!
+      for (const prob of problems) {
+        const isSolved = solvedSubmissions.some(
+          (s) =>
+            normalizeProblemId(s.problemId) === normalizeProblemId(prob.id) ||
+            normalizeProblemId(s.problemId) === normalizeProblemId(prob.slug)
+        );
+        if (isSolved) {
+          problemsSolved += 1;
+          const problemHintDeductions = userReceipts
+            .filter(
+              (r) =>
+                normalizeProblemId(r.problemId) === normalizeProblemId(prob.id) ||
+                normalizeProblemId(r.problemId) === normalizeProblemId(prob.slug)
+            )
+            .reduce((sum, r) => sum + r.deductionApplied, 0);
 
-      const totalScore = Math.max(0, rawScore - totalHintPenalties);
+          const awarded = Math.max(0, prob.points - problemHintDeductions);
+          totalScore += awarded;
+        }
+      }
 
       rows.push({
         driverId: p.driverId,
@@ -105,21 +129,46 @@ export class LeaderboardService {
    * Get candidate's personal progress
    */
   static async getProgress(userId: string, driverId: string, contestId: string = env.CONTEST_ID) {
+    const contest = await ContestRepository.getContest(contestId);
     const problems = await ProblemRepository.findAllPublic();
     const totalProblems = problems.length;
 
     const solvedSubmissions = await SubmissionRepository.findAllSolvedByUser(userId);
-    const solvedProblemIds = Array.from(new Set(solvedSubmissions.map((s) => s.problemId)));
+    const allUserSubmissions = await SubmissionRepository.findAllByUser(userId);
+    const userReceipts = await HintRepository.getUserHintReceipts(userId, contest.id);
 
-    const rawScore = solvedSubmissions.reduce((sum, s) => sum + s.score, 0);
-    const totalHintPenalties = await HintRepository.getTotalHintPenaltiesForUser(userId, contestId);
-    const currentScore = Math.max(0, rawScore - totalHintPenalties);
+    let currentScore = 0;
+    const solvedProblemIds: string[] = [];
+
+    for (const prob of problems) {
+      const isSolved = solvedSubmissions.some(
+        (s) =>
+          normalizeProblemId(s.problemId) === normalizeProblemId(prob.id) ||
+          normalizeProblemId(s.problemId) === normalizeProblemId(prob.slug)
+      );
+      if (isSolved) {
+        solvedProblemIds.push(prob.slug);
+        const problemHintDeductions = userReceipts
+          .filter(
+            (r) =>
+              normalizeProblemId(r.problemId) === normalizeProblemId(prob.id) ||
+              normalizeProblemId(r.problemId) === normalizeProblemId(prob.slug)
+          )
+          .reduce((sum, r) => sum + r.deductionApplied, 0);
+
+        currentScore += Math.max(0, prob.points - problemHintDeductions);
+      }
+    }
+
+    const attemptedProblemIds = Array.from(
+      new Set(allUserSubmissions.map((s) => s.problemId))
+    );
 
     return {
-      contestId,
+      contestId: contest.id,
       driverId,
       totalProblems,
-      attemptedProblemIds: solvedProblemIds,
+      attemptedProblemIds,
       solvedProblemIds,
       currentScore,
       simulation: false

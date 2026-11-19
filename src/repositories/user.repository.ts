@@ -3,6 +3,9 @@
 // ==============================================================================
 
 import { prisma } from "../config/database.js";
+import { env } from "../config/env.js";
+import { AppError } from "../middleware/error.middleware.js";
+import { ERROR_CODES } from "../constants/index.js";
 import { Role, User } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
@@ -13,106 +16,109 @@ const HASHED_PASS_VOLUNTEER = bcrypt.hashSync("racecontrol2026", 10);
 const HASHED_PASS_MARSHAL2026 = bcrypt.hashSync("Marshal2026!", 10);
 const HASHED_PASS_ADMIN2026 = bcrypt.hashSync("Control2026!", 10);
 
-const inMemoryUsers: Map<string, User> = new Map([
-  [
-    "CGP2026",
-    {
-      id: "u_cgp2026",
-      driverId: "CGP2026",
-      displayName: "Demo Driver",
-      team: "CPC / Preview grid",
-      passwordHash: HASHED_PASS_RACE2026,
-      role: Role.CANDIDATE,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ],
-  [
-    "VOLUNTEER2026",
-    {
-      id: "u_vol2026",
-      driverId: "VOLUNTEER2026",
-      displayName: "Demo Marshal",
-      team: "CPC / Race control",
-      passwordHash: HASHED_PASS_MARSHAL2026,
-      role: Role.VOLUNTEER,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ],
-  [
-    "ADMIN2026",
-    {
-      id: "u_admin2026",
-      driverId: "ADMIN2026",
-      displayName: "Demo Organizer",
-      team: "CPC / Administration",
-      passwordHash: HASHED_PASS_ADMIN2026,
-      role: Role.ADMIN,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ],
-  [
-    "CGP_045",
-    {
-      id: "u_045",
-      driverId: "CGP_045",
-      displayName: "Lewis Hamilton",
-      team: "Mercedes AMG",
-      passwordHash: HASHED_PASS_DRIVER,
-      role: Role.CANDIDATE,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ],
-  [
-    "CGP_016",
-    {
-      id: "u_016",
-      driverId: "CGP_016",
-      displayName: "Charles Leclerc",
-      team: "Scuderia Ferrari",
-      passwordHash: HASHED_PASS_DRIVER,
-      role: Role.CANDIDATE,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ],
-  [
-    "CGP_001",
-    {
-      id: "u_001",
-      driverId: "CGP_001",
-      displayName: "Max Verstappen",
-      team: "Red Bull Racing",
-      passwordHash: HASHED_PASS_DRIVER,
-      role: Role.CANDIDATE,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ],
-  [
-    "VOL_RACE_CONTROL",
-    {
-      id: "u_vol_01",
-      driverId: "VOL_RACE_CONTROL",
-      displayName: "Race Director Charlie",
-      team: "FIA Race Control",
-      passwordHash: HASHED_PASS_VOLUNTEER,
-      role: Role.VOLUNTEER,
-      lastLogoutAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
-  ]
-]);
+const inMemoryUsers: Map<string, User> =
+  env.NODE_ENV === "production"
+    ? new Map()
+    : new Map([
+        [
+          "CGP2026",
+          {
+            id: "u_cgp2026",
+            driverId: "CGP2026",
+            displayName: "Demo Driver",
+            team: "CPC / Preview grid",
+            passwordHash: HASHED_PASS_RACE2026,
+            role: Role.CANDIDATE,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ],
+        [
+          "VOLUNTEER2026",
+          {
+            id: "u_vol2026",
+            driverId: "VOLUNTEER2026",
+            displayName: "Demo Marshal",
+            team: "CPC / Race control",
+            passwordHash: HASHED_PASS_MARSHAL2026,
+            role: Role.VOLUNTEER,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ],
+        [
+          "ADMIN2026",
+          {
+            id: "u_admin2026",
+            driverId: "ADMIN2026",
+            displayName: "Demo Organizer",
+            team: "CPC / Administration",
+            passwordHash: HASHED_PASS_ADMIN2026,
+            role: Role.ADMIN,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ],
+        [
+          "CGP_045",
+          {
+            id: "u_045",
+            driverId: "CGP_045",
+            displayName: "Lewis Hamilton",
+            team: "Mercedes AMG",
+            passwordHash: HASHED_PASS_DRIVER,
+            role: Role.CANDIDATE,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ],
+        [
+          "CGP_016",
+          {
+            id: "u_016",
+            driverId: "CGP_016",
+            displayName: "Charles Leclerc",
+            team: "Scuderia Ferrari",
+            passwordHash: HASHED_PASS_DRIVER,
+            role: Role.CANDIDATE,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ],
+        [
+          "CGP_001",
+          {
+            id: "u_001",
+            driverId: "CGP_001",
+            displayName: "Max Verstappen",
+            team: "Red Bull Racing",
+            passwordHash: HASHED_PASS_DRIVER,
+            role: Role.CANDIDATE,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ],
+        [
+          "VOL_RACE_CONTROL",
+          {
+            id: "u_vol_01",
+            driverId: "VOL_RACE_CONTROL",
+            displayName: "Race Director Charlie",
+            team: "FIA Race Control",
+            passwordHash: HASHED_PASS_VOLUNTEER,
+            role: Role.VOLUNTEER,
+            lastLogoutAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ]
+      ]);
 
 export class UserRepository {
   static async findByDriverId(driverId: string): Promise<User | null> {
@@ -127,8 +133,15 @@ export class UserRepository {
         }
       });
       if (user) return user;
-    } catch {
-      // Fallback
+      if (env.NODE_ENV === "production") return null;
+    } catch (error) {
+      if (env.NODE_ENV === "production") {
+        throw new AppError(
+          503,
+          ERROR_CODES.INTERNAL_SERVER_ERROR,
+          "Database service unavailable in production."
+        );
+      }
     }
 
     for (const [key, user] of inMemoryUsers.entries()) {
@@ -145,8 +158,15 @@ export class UserRepository {
         where: { id }
       });
       if (user) return user;
-    } catch {
-      // Fallback
+      if (env.NODE_ENV === "production") return null;
+    } catch (error) {
+      if (env.NODE_ENV === "production") {
+        throw new AppError(
+          503,
+          ERROR_CODES.INTERNAL_SERVER_ERROR,
+          "Database service unavailable in production."
+        );
+      }
     }
 
     for (const user of inMemoryUsers.values()) {
@@ -163,8 +183,15 @@ export class UserRepository {
         }
       });
       if (users && users.length > 0) return users;
-    } catch {
-      // Fallback
+      if (env.NODE_ENV === "production") return [];
+    } catch (error) {
+      if (env.NODE_ENV === "production") {
+        throw new AppError(
+          503,
+          ERROR_CODES.INTERNAL_SERVER_ERROR,
+          "Database service unavailable in production."
+        );
+      }
     }
 
     return Array.from(inMemoryUsers.values()).filter(
@@ -178,8 +205,15 @@ export class UserRepository {
         where: { id: userId },
         data: { lastLogoutAt: date }
       });
-    } catch {
-      // Fallback
+      return;
+    } catch (error) {
+      if (env.NODE_ENV === "production") {
+        throw new AppError(
+          503,
+          ERROR_CODES.INTERNAL_SERVER_ERROR,
+          "Database service unavailable in production."
+        );
+      }
     }
 
     for (const user of inMemoryUsers.values()) {

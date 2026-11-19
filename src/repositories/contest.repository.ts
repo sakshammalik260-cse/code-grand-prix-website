@@ -9,7 +9,7 @@ import { Contest, ContestStatus } from "@prisma/client";
 const defaultContest: Contest = {
   id: env.CONTEST_ID,
   title: "Code Grand Prix 2026",
-  status: env.CONTEST_STATUS as ContestStatus,
+  status: ContestStatus.LIVE,
   resultsVisible: true,
   startsAt: new Date(env.CONTEST_START_TIME),
   endsAt: new Date(env.CONTEST_END_TIME),
@@ -25,7 +25,9 @@ export class ContestRepository {
       });
       if (contest) return contest;
     } catch {
-      // Fallback
+      if (env.NODE_ENV === "production" && !env.ALLOW_DEV_FALLBACK) {
+        throw new Error("Database unavailable while fetching contest state.");
+      }
     }
     return defaultContest;
   }
@@ -33,23 +35,43 @@ export class ContestRepository {
   static calculateTimeDetails(contest: Contest) {
     const now = new Date();
     const serverTime = now.toISOString();
-    const endsAt = contest.endsAt.toISOString();
     const startsAt = contest.startsAt.toISOString();
+    const endsAt = contest.endsAt.toISOString();
 
-    const remainingMs = Math.max(0, contest.endsAt.getTime() - now.getTime());
-    let status = contest.status;
+    const nowTime = now.getTime();
+    const startTime = contest.startsAt.getTime();
+    const endTime = contest.endsAt.getTime();
 
-    // Check if contest has naturally finished
-    if (status === ContestStatus.LIVE && remainingMs === 0) {
-      status = ContestStatus.ENDED;
+    let status: "WAITING" | "LIVE" | "PAUSED_BY_ORGANIZER" | "FINISHED";
+
+    // C06 Fix: Authoritative schedule check
+    if (contest.status === ContestStatus.PAUSED || contest.status === ContestStatus.PAUSED_BY_ORGANIZER) {
+      status = "PAUSED_BY_ORGANIZER";
+    } else if (nowTime < startTime) {
+      status = "WAITING";
+    } else if (nowTime >= endTime) {
+      status = "FINISHED";
+    } else {
+      status = "LIVE";
     }
 
+    const remainingMs = Math.max(0, endTime - nowTime);
+
     return {
+      id: contest.id,
+      title: contest.title,
+      round: env.CONTEST_ROUND_NAME,
       status,
-      startsAt,
-      endsAt,
+      // Frontend contract field names (Page 9 & 14)
+      contestStartTime: startsAt,
+      contestEndTime: endsAt,
       serverTime,
       remainingMs,
+      simulation: false,
+      // Backend contract compatibility
+      startsAt,
+      endsAt,
+      resultsVisible: contest.resultsVisible,
       timerPolicy: {
         type: "GLOBAL_AUTHORITATIVE",
         syncIntervalMs: 15000,

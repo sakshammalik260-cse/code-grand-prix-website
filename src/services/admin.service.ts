@@ -8,6 +8,7 @@ import { Difficulty, ProblemStatus } from "@prisma/client";
 import { ProblemRepository } from "../repositories/problem.repository.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { IncidentRepository } from "../repositories/incident.repository.js";
+import { ContestRepository } from "../repositories/contest.repository.js";
 import { v4 as uuidv4 } from "uuid";
 
 export interface CreateAdminProblemInput {
@@ -27,17 +28,50 @@ export interface CreateAdminProblemInput {
 
 export class AdminService {
   static async getOverview() {
-    const problems = await ProblemRepository.findAllPublic();
+    let totalQuestions = 0;
+    let draftQuestions = 0;
+    let publishedQuestions = 0;
+
+    try {
+      totalQuestions = await prisma.problem.count();
+      draftQuestions = await prisma.problem.count({ where: { status: ProblemStatus.DRAFT } });
+      publishedQuestions = await prisma.problem.count({ where: { status: ProblemStatus.PUBLISHED } });
+    } catch {
+      const publicProblems = await ProblemRepository.findAllPublic();
+      totalQuestions = publicProblems.length;
+      publishedQuestions = publicProblems.length;
+      draftQuestions = 0;
+    }
+
     const participants = await UserRepository.findAllParticipants();
     const incidents = await IncidentRepository.findAll();
+    const contest = await ContestRepository.getContest(env.CONTEST_ID);
+    const timeDetails = ContestRepository.calculateTimeDetails(contest);
 
     return {
-      totalProblems: problems.length,
+      // Frontend Handoff Page 10 Contract
+      totalQuestions,
+      draftQuestions,
+      publishedQuestions,
+      competitionStatus: timeDetails.status,
+      participants: participants.length,
+      activeRounds: [
+        {
+          id: contest.id,
+          name: contest.title,
+          round: timeDetails.round,
+          status: timeDetails.status,
+          contestStartTime: timeDetails.contestStartTime,
+          contestEndTime: timeDetails.contestEndTime
+        }
+      ],
+      // Backwards-compatible fields
+      totalProblems: totalQuestions,
       totalParticipants: participants.length,
       totalIncidents: incidents.length,
       openIncidents: incidents.filter((i) => i.status === "OPEN").length,
-      contestId: env.CONTEST_ID,
-      contestStatus: env.CONTEST_STATUS
+      contestId: contest.id,
+      contestStatus: timeDetails.status
     };
   }
 

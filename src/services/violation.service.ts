@@ -6,7 +6,7 @@ import { env } from "../config/env.js";
 import { IncidentRepository } from "../repositories/incident.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { ContestRepository } from "../repositories/contest.repository.js";
-import { IncidentAction, IncidentType } from "@prisma/client";
+import { IncidentAction, IncidentType, RaceSessionStatus } from "@prisma/client";
 
 export interface ReportViolationInput {
   clientEventId?: string;
@@ -22,9 +22,6 @@ export interface ReportViolationInput {
 }
 
 export class ViolationService {
-  /**
-   * Helper to normalize incident types across frontend versions
-   */
   private static normalizeIncidentType(rawType: string): IncidentType {
     const t = rawType.toUpperCase();
     if (t === "TAB_HIDDEN") return IncidentType.TAB_HIDDEN;
@@ -36,9 +33,6 @@ export class ViolationService {
     return IncidentType.TAB_HIDDEN;
   }
 
-  /**
-   * Report a violation from the frontend monitoring system
-   */
   static async reportViolation(userId: string, input: ReportViolationInput) {
     const eventId = input.clientEventId || input.eventId || `event_${Date.now()}`;
     const contestId = input.contestId || env.CONTEST_ID;
@@ -58,6 +52,7 @@ export class ViolationService {
           sessionId: existing.sessionId,
           type: existing.type,
           reviewStatus: existing.status,
+          status: existing.status,
           blocking: existing.blocking,
           timestamp: existing.receivedAt.toISOString(),
           simulation: false
@@ -86,7 +81,15 @@ export class ViolationService {
     const action = isCritical ? IncidentAction.LOCK : IncidentAction.LOG_ONLY;
 
     let updatedSession = session;
-    if (action === IncidentAction.LOCK) {
+
+    // C17 Fix: Suppress redundant lock state transition if session is already locked
+    const alreadyLocked =
+      session.status === RaceSessionStatus.LOCKED ||
+      session.status === RaceSessionStatus.LOCK_PENDING ||
+      session.status === RaceSessionStatus.UNDER_REVIEW;
+
+    if (action === IncidentAction.LOCK && !alreadyLocked) {
+      // First critical event in this episode -> locks session and increments lockCount
       updatedSession = await SessionRepository.lockSession(
         userId,
         contestId,
@@ -118,6 +121,7 @@ export class ViolationService {
         sessionId: incident.sessionId,
         type: incident.type,
         reviewStatus: incident.status,
+        status: incident.status,
         blocking: incident.blocking,
         timestamp: incident.receivedAt.toISOString(),
         simulation: false

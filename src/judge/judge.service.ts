@@ -13,14 +13,15 @@ import { ProblemRepository } from "../repositories/problem.repository.js";
 import { SubmissionRepository } from "../repositories/submission.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { ContestRepository } from "../repositories/contest.repository.js";
-import { SubmissionStatus, Verdict, CheckinStatus, RaceSessionStatus, ContestStatus } from "@prisma/client";
+import { SubmissionStatus, Verdict, CheckinStatus, RaceSessionStatus } from "@prisma/client";
 
 export interface RunCodeInput {
   sessionId?: string;
   contestId?: string;
   driverId?: string;
   problemId: string;
-  language: string;
+  language?: string;
+  languageId?: string;
   sourceCode: string;
   customInput?: string;
 }
@@ -30,7 +31,8 @@ export interface SubmitCodeInput {
   contestId?: string;
   driverId?: string;
   problemId: string;
-  language: string;
+  language?: string;
+  languageId?: string;
   sourceCode: string;
 }
 
@@ -38,21 +40,25 @@ export class JudgeService {
   private static adapter: IJudgeAdapter;
 
   private static getAdapter(): IJudgeAdapter {
+    // C01 Fix: Disable unhardened local runner in production
+    if (env.NODE_ENV === "production" && env.JUDGE_PROVIDER === "local") {
+      throw new AppError(
+        500,
+        ERROR_CODES.INTERNAL_SERVER_ERROR,
+        "C01 Refusal: Local code execution adapter is disabled in production. Set JUDGE_PROVIDER=judge0."
+      );
+    }
+
     if (!this.adapter) {
       if (env.JUDGE_PROVIDER === "judge0") {
-        console.log("⚙️  Using Judge0 Production Adapter for code execution.");
         this.adapter = new Judge0Adapter();
       } else {
-        console.log("⚙️  Using Local Subprocess Sandbox for development code execution.");
         this.adapter = new LocalSandboxJudge();
       }
     }
     return this.adapter;
   }
 
-  /**
-   * Helper to normalize output text for reliable competitive programming comparison
-   */
   private static normalizeOutput(text: string): string {
     return text
       .replace(/\r\n/g, "\n")
@@ -63,19 +69,75 @@ export class JudgeService {
   }
 
   /**
-   * Run Code against public sample cases or custom input
+   * C02 & C05 Fix: Comprehensive Server-Side Gates for Run & Submit
    */
-  static async runCode(userId: string, input: RunCodeInput) {
-    const problem = await ProblemRepository.findByIdWithAllTests(input.problemId);
+  private static async validateExecutionGates(
+    userId: string,
+    contestId: string,
+    problemId: string,
+    language: string,
+    sourceCode: string,
+    customInput?: string
+  ) {
+    // 1. Contest Gate
+    const contest = await ContestRepository.getContest(contestId);
+    const timeDetails = ContestRepository.calculateTimeDetails(contest);
+    if (timeDetails.status !== "LIVE") {
+      throw new AppError(
+        409,
+        ERROR_CODES.CONTEST_NOT_LIVE,
+        `Contest is currently ${timeDetails.status}. Code execution is only permitted during LIVE status.`
+      );
+    }
+
+    // 2. Session Integrity Gate
+    const session = await SessionRepository.findOrCreate(userId, contestId);
+    const isLocked =
+      session.status === RaceSessionStatus.LOCKED ||
+      session.status === RaceSessionStatus.LOCK_PENDING ||
+      session.status === RaceSessionStatus.UNDER_REVIEW;
+
+    if (isLocked) {
+      throw new AppError(
+        403,
+        ERROR_CODES.SESSION_LOCKED,
+        `Your session is ${session.status} due to: ${session.lockReason || "an integrity alert"}. Code execution is blocked until resolved by a volunteer.`
+      );
+    }
+
+    if (session.checkinStatus !== CheckinStatus.READY) {
+      throw new AppError(
+        403,
+        ERROR_CODES.CHECKIN_INCOMPLETE,
+        "Pre-race check-in is incomplete. Complete camera and fullscreen check before running or submitting code."
+      );
+    }
+
+    // 3. Problem Gate (C07 Fix: Must be strictly PUBLISHED)
+    const problem = await ProblemRepository.findByIdWithAllTests(problemId, true);
     if (!problem) {
       throw new AppError(
         404,
         ERROR_CODES.RESOURCE_NOT_FOUND,
-        `Problem '${input.problemId}' does not exist.`
+        `Problem '${problemId}' is either unpublished, future-round, or does not exist.`
       );
     }
 
-    if (input.sourceCode.length > env.MAX_SOURCE_CODE_BYTES) {
+    // 4. Language Gate (C02 Fix: Must be in allowedLanguages)
+    const langNormalized = language.toLowerCase();
+    const isAllowed = problem.allowedLanguages.some(
+      (l) => l.toLowerCase() === langNormalized || (langNormalized === "js" && l === "javascript")
+    );
+    if (!isAllowed) {
+      throw new AppError(
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        `Language '${language}' is not permitted for problem '${problem.title}'. Allowed languages: [${problem.allowedLanguages.join(", ")}].`
+      );
+    }
+
+    // 5. Payload Size Caps
+    if (sourceCode.length > env.MAX_SOURCE_CODE_BYTES) {
       throw new AppError(
         400,
         ERROR_CODES.VALIDATION_ERROR,
@@ -83,13 +145,39 @@ export class JudgeService {
       );
     }
 
+    if (customInput && customInput.length > env.MAX_CUSTOM_INPUT_BYTES) {
+      throw new AppError(
+        400,
+        ERROR_CODES.VALIDATION_ERROR,
+        `Custom input exceeds maximum allowed size of ${env.MAX_CUSTOM_INPUT_BYTES} bytes.`
+      );
+    }
+
+    return { problem, session, contest };
+  }
+
+  /**
+   * Run Code against public sample cases or custom input
+   */
+  static async runCode(userId: string, input: RunCodeInput) {
+    const contestId = input.contestId || env.CONTEST_ID;
+    const language = (input.language || input.languageId || "").toLowerCase();
+    const { problem } = await this.validateExecutionGates(
+      userId,
+      contestId,
+      input.problemId,
+      language,
+      input.sourceCode,
+      input.customInput
+    );
+
     const adapter = this.getAdapter();
     const runId = `run_${uuidv4()}`;
 
     // Case A: Custom Input Execution
     if (input.customInput !== undefined && input.customInput !== null) {
       const exec = await adapter.execute({
-        language: input.language,
+        language,
         sourceCode: input.sourceCode,
         stdin: input.customInput,
         timeLimitMs: problem.timeLimitMs,
@@ -99,11 +187,11 @@ export class JudgeService {
       return {
         id: runId,
         problemId: problem.slug,
-        language: input.language,
+        language,
         status: exec.status,
         stdout: exec.stdout,
         stderr: exec.stderr,
-        expectedOutput: null, // As specified in contract: null for custom input
+        expectedOutput: null,
         executionTimeMs: exec.runtimeMs,
         memoryUsageKb: exec.memoryKb,
         cases: [
@@ -134,7 +222,7 @@ export class JudgeService {
     for (let i = 0; i < publicCases.length; i++) {
       const tc = publicCases[i];
       const exec = await adapter.execute({
-        language: input.language,
+        language,
         sourceCode: input.sourceCode,
         stdin: tc.input,
         timeLimitMs: problem.timeLimitMs,
@@ -171,7 +259,6 @@ export class JudgeService {
         status: caseStatus
       });
 
-      // Stop on fatal compilation error
       if (exec.status === VERDICTS.COMPILATION_ERROR) {
         break;
       }
@@ -180,7 +267,7 @@ export class JudgeService {
     return {
       id: runId,
       problemId: problem.slug,
-      language: input.language,
+      language,
       status: overallStatus,
       stdout: lastStdout,
       stderr: lastStderr,
@@ -195,65 +282,25 @@ export class JudgeService {
   /**
    * Submit Code against private hidden test cases and persist official verdict
    */
-  static async submitCode(userId: string, input: SubmitCodeInput) {
+  static async submitCode(userId: string, trustedDriverId: string, input: SubmitCodeInput) {
     const contestId = input.contestId || env.CONTEST_ID;
+    const language = (input.language || input.languageId || "").toLowerCase();
+    const { problem } = await this.validateExecutionGates(
+      userId,
+      contestId,
+      input.problemId,
+      language,
+      input.sourceCode
+    );
 
-    // 1. Contest Gate
-    const contest = await ContestRepository.getContest(contestId);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
-    if (timeDetails.status !== ContestStatus.LIVE) {
-      throw new AppError(
-        409,
-        ERROR_CODES.CONTEST_NOT_LIVE,
-        `Contest is currently ${timeDetails.status}. Submissions are only permitted during LIVE status.`
-      );
-    }
-
-    // 2. Session Integrity Gate
-    const session = await SessionRepository.findOrCreate(userId, contestId);
-    if (session.status === RaceSessionStatus.LOCKED) {
-      throw new AppError(
-        403,
-        ERROR_CODES.SESSION_LOCKED,
-        `Your session is LOCKED due to: ${session.lockReason || "integrity alert"}. Submissions are blocked until resolved by a volunteer.`
-      );
-    }
-
-    if (session.checkinStatus !== CheckinStatus.READY) {
-      throw new AppError(
-        403,
-        ERROR_CODES.CHECKIN_INCOMPLETE,
-        "Pre-race check-in is incomplete. Complete camera and fullscreen check before submitting code."
-      );
-    }
-
-    // 3. Problem Retrieval
-    const problem = await ProblemRepository.findByIdWithAllTests(input.problemId);
-    if (!problem) {
-      throw new AppError(
-        404,
-        ERROR_CODES.RESOURCE_NOT_FOUND,
-        `Problem '${input.problemId}' does not exist.`
-      );
-    }
-
-    if (input.sourceCode.length > env.MAX_SOURCE_CODE_BYTES) {
-      throw new AppError(
-        400,
-        ERROR_CODES.VALIDATION_ERROR,
-        `Source code exceeds maximum allowed size of ${env.MAX_SOURCE_CODE_BYTES} bytes.`
-      );
-    }
-
-    // 4. Create initial Submission record (QUEUED)
+    // Create Submission record
     const submission = await SubmissionRepository.create({
       userId,
       problemId: problem.id,
-      languageId: input.language,
+      languageId: language,
       sourceCode: input.sourceCode
     });
 
-    // 5. Execute judging pipeline
     const adapter = this.getAdapter();
     const allCases = problem.testCases;
     let passedTests = 0;
@@ -265,7 +312,7 @@ export class JudgeService {
     for (let i = 0; i < allCases.length; i++) {
       const tc = allCases[i];
       const exec = await adapter.execute({
-        language: input.language,
+        language,
         sourceCode: input.sourceCode,
         stdin: tc.input,
         timeLimitMs: problem.timeLimitMs,
@@ -293,7 +340,6 @@ export class JudgeService {
         break;
       }
 
-      // Check output correctness
       const studentNorm = this.normalizeOutput(exec.stdout);
       const expectedNorm = this.normalizeOutput(tc.expectedOutput);
 
@@ -308,11 +354,9 @@ export class JudgeService {
       }
     }
 
-    // Award points only if all test cases passed
     const score = finalVerdict === VERDICTS.ACCEPTED ? problem.points : 0;
 
-    // Update submission record with terminal result
-    const updatedSubmission = await SubmissionRepository.updateVerdict(submission.id, {
+    await SubmissionRepository.updateVerdict(submission.id, {
       status: SubmissionStatus.COMPLETED,
       verdict: finalVerdict as Verdict,
       score,
@@ -323,13 +367,14 @@ export class JudgeService {
       message
     });
 
+    // Frontend SubmissionResult DTO (Page 7 & 9)
     return {
       id: submission.id,
       submissionId: submission.id,
       contestId,
-      driverId: input.driverId,
+      driverId: trustedDriverId,
       problemId: problem.slug,
-      language: input.language,
+      language,
       status: finalVerdict,
       verdict: finalVerdict,
       score,
@@ -344,7 +389,7 @@ export class JudgeService {
   }
 
   /**
-   * Retrieve submission details by ID
+   * C03 Fix: Retrieve submission details by ID with strict role checking
    */
   static async getSubmission(submissionId: string, userId: string, userRole: string) {
     const submission = await SubmissionRepository.findById(submissionId);
@@ -356,8 +401,11 @@ export class JudgeService {
       );
     }
 
-    // Role check: Candidates can only see their own submissions
-    if (userRole.toLowerCase() === "participant" && submission.userId !== userId) {
+    const roleUpper = userRole.toUpperCase();
+    const isStaff = roleUpper === "ADMIN" || roleUpper === "VOLUNTEER";
+
+    // C03 Fix: Candidate role is CANDIDATE or PARTICIPANT
+    if (!isStaff && submission.userId !== userId) {
       throw new AppError(
         403,
         ERROR_CODES.FORBIDDEN_ROLE,

@@ -32,8 +32,11 @@ async function main() {
   console.log("\n▶️ Running Phase 5 Tests...");
   const p5 = await runCommand("npx", ["tsx", "tests/phase5.test.ts"]);
 
-  if (p3 && p4 && p5) {
-    console.log("\n🎉 ALL 46 TESTS ACROSS ALL PHASES PASSED SUCCESSFULLY!");
+  console.log("\n▶️ Running Remediation Audit (C01–C17) Tests...");
+  const pRemediation = await runCommand("npx", ["tsx", "tests/remediation.test.ts"]);
+
+  if (p3 && p4 && p5 && pRemediation) {
+    console.log("\n🎉 ALL TESTS (PHASES 3, 4, 5 & REMEDIATION) PASSED SUCCESSFULLY!");
     process.exit(0);
   } else {
     console.error("\n❌ Some tests failed.");

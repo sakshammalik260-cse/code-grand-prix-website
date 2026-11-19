@@ -166,15 +166,22 @@ export class HintRepository {
   }
 
   static async getTotalHintPenaltiesForUser(userId: string, contestId: string): Promise<number> {
+    const receipts = await this.getUserHintReceipts(userId, contestId);
+    return receipts.reduce((sum, r) => sum + r.deductionApplied, 0);
+  }
+
+  static async getUserHintReceipts(userId: string, contestId: string): Promise<HintReceipt[]> {
     try {
       const receipts = await prisma.hintReceipt.findMany({
         where: { userId, contestId }
       });
-      return receipts.reduce((sum, r) => sum + r.deductionApplied, 0);
+      if (receipts && receipts.length > 0) return receipts;
     } catch {
-      return Array.from(inMemoryReceipts.values())
-        .filter((r) => r.userId === userId && r.contestId === contestId)
-        .reduce((sum, r) => sum + r.deductionApplied, 0);
+      // Fallback
     }
+
+    return Array.from(inMemoryReceipts.values()).filter(
+      (r) => r.userId === userId && r.contestId === contestId
+    );
   }
 }

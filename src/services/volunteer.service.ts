@@ -12,6 +12,8 @@ import { SubmissionRepository } from "../repositories/submission.repository.js";
 import { env } from "../config/env.js";
 
 export class VolunteerService {
+  private static idempotencyStore = new Map<string, any>();
+
   /**
    * List participants with live competition session status, score, and lock details
    */
@@ -140,15 +142,20 @@ export class VolunteerService {
       idempotencyKey?: string;
     }
   ) {
+    // C16: Idempotency check
+    if (input.idempotencyKey && VolunteerService.idempotencyStore.has(input.idempotencyKey)) {
+      return VolunteerService.idempotencyStore.get(input.idempotencyKey);
+    }
+
     const session = await SessionRepository.findById(sessionId);
     if (!session) {
       throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Session '${sessionId}' not found.`);
     }
 
-    // Monotonic revision check
+    // C15: Exact monotonic revision check (mismatch indicates concurrent state update)
     if (
       input.expectedSessionRevision !== undefined &&
-      session.revision > input.expectedSessionRevision
+      session.revision !== input.expectedSessionRevision
     ) {
       throw new AppError(
         409,
@@ -178,7 +185,7 @@ export class VolunteerService {
 
     const latestIncident = resolvedIncidents[0] || null;
 
-    return {
+    const result = {
       incident: latestIncident
         ? {
             id: latestIncident.id,
@@ -211,5 +218,11 @@ export class VolunteerService {
         simulation: false
       }
     };
+
+    if (input.idempotencyKey) {
+      VolunteerService.idempotencyStore.set(input.idempotencyKey, result);
+    }
+
+    return result;
   }
 }

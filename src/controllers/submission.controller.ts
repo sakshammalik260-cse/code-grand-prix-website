@@ -6,24 +6,34 @@ import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { JudgeService } from "../judge/judge.service.js";
 
-export const runCodeSchema = z.object({
-  sessionId: z.string().optional(),
-  contestId: z.string().optional(),
-  driverId: z.string().optional(),
-  problemId: z.string().min(1, "problemId is required"),
-  language: z.string().min(1, "language is required"),
-  sourceCode: z.string().min(1, "sourceCode cannot be empty"),
-  customInput: z.string().optional()
-});
+export const runCodeSchema = z
+  .object({
+    sessionId: z.string().optional(),
+    contestId: z.string().optional(),
+    driverId: z.string().optional(),
+    problemId: z.string().min(1, "problemId is required"),
+    language: z.string().optional(),
+    languageId: z.string().optional(),
+    sourceCode: z.string().min(1, "sourceCode cannot be empty"),
+    customInput: z.string().optional()
+  })
+  .refine((data) => !!(data.language || data.languageId), {
+    message: "language or languageId is required"
+  });
 
-export const submitCodeSchema = z.object({
-  sessionId: z.string().optional(),
-  contestId: z.string().optional(),
-  driverId: z.string().optional(),
-  problemId: z.string().min(1, "problemId is required"),
-  language: z.string().min(1, "language is required"),
-  sourceCode: z.string().min(1, "sourceCode cannot be empty")
-});
+export const submitCodeSchema = z
+  .object({
+    sessionId: z.string().optional(),
+    contestId: z.string().optional(),
+    driverId: z.string().optional(),
+    problemId: z.string().min(1, "problemId is required"),
+    language: z.string().optional(),
+    languageId: z.string().optional(),
+    sourceCode: z.string().min(1, "sourceCode cannot be empty")
+  })
+  .refine((data) => !!(data.language || data.languageId), {
+    message: "language or languageId is required"
+  });
 
 export class SubmissionController {
   static async runCode(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -37,7 +47,7 @@ export class SubmissionController {
 
   static async submitCode(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await JudgeService.submitCode(req.user!.id, req.body);
+      const result = await JudgeService.submitCode(req.user!.id, req.user!.driverId, req.body);
       res.status(200).json(result);
     } catch (error) {
       next(error);
