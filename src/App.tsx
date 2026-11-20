@@ -11,13 +11,14 @@ import { LoginPage } from './pages/LoginPage'
 import { CheckInPage } from './pages/CheckInPage'
 import { LobbyPage } from './pages/LobbyPage'
 import { NotFoundPage } from './pages/PlaceholderPages'
+import { BrandIntro } from './components/BrandIntro'
 
 const AdminPage = lazy(()=>import('./pages/admin/AdminPage'))
 const VolunteerPage = lazy(() => import('./pages/VolunteerPage'))
 const ArenaPage = lazy(() => import('./pages/ArenaPage'))
 
 export default function App() {
-  return <MotionConfig reducedMotion="user"><BrowserRouter><SessionProvider><CameraLifecycle /><Routes>
+  return <MotionConfig reducedMotion="user"><BrandIntro><BrowserRouter><SessionProvider><CameraLifecycle /><Routes>
     <Route element={<Layout />}>
       <Route index element={<LandingPage />} />
       <Route path="login" element={<LoginPage />} />
@@ -36,5 +37,5 @@ export default function App() {
       <Route path="checkin" element={<Navigate to="/check-in" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Route>
-  </Routes></SessionProvider></BrowserRouter></MotionConfig>
+  </Routes></SessionProvider></BrowserRouter></BrandIntro></MotionConfig>
 }

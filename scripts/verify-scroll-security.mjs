@@ -10,7 +10,7 @@ async function publicMenu(){if(await evaluate("getComputedStyle(document.querySe
 async function sectionLink(hash){await publicMenu();await click(`#main-navigation a[href='/#${hash}']`);await wait(`location.hash==='#${hash}'`);await new Promise(r=>setTimeout(r,900))}
 try{
   await go('/login');await wait("!!document.querySelector('.login-preview-access')") // Refuse to run mutations against production.
-  await evaluate('sessionStorage.clear()');await go('/')
+  await evaluate("sessionStorage.clear();sessionStorage.setItem('cgp-brand-intro-v1','seen');sessionStorage.setItem('cgp-brand-intro-disabled','1')");await go('/')
   for(const [width,height] of [[1920,1080],[1440,900],[1366,768],[768,1024],[390,844]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false})
     await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]})
