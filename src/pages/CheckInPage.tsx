@@ -52,7 +52,7 @@ export function CheckInPage() {
       <div className="dashboard-heading"><h1>PRE-RACE INSPECTION</h1><p>Verify your setup. Prepare for the grid.</p></div>
       <div className="inspection-layout">
         <aside className="inspection-sidebar" aria-label="Inspection checklist">
-          <ol className="inspection-steps">{inspectionSteps.map((step, index) => <li key={step.title} className={step.done ? 'complete' : index === nextStep ? 'current' : ''} aria-current={index === nextStep ? 'step' : undefined}><span className="inspection-step-marker">{step.done ? <Check size={17} strokeWidth={3} /> : <span>{index + 1}</span>}</span><span>{step.title}</span><span className="sr-only">{step.done ? ', complete' : ', pending'}</span></li>)}</ol>
+          <ol className="inspection-steps" aria-hidden="true">{inspectionSteps.map((step, index) => <li key={step.title} className={step.done ? 'complete' : index === nextStep ? 'current' : ''}><span className="inspection-step-marker">{step.done ? <Check size={17} strokeWidth={3} /> : <span>{index + 1}</span>}</span><span>{step.title}</span></li>)}</ol>
           <div className="inspection-identity"><UserRound size={18} /><div><strong>{driver?.name}</strong><span>{driver?.id}</span></div><ShieldCheck size={17} /></div>
           <p className="inspection-help">Need a hand? Ask a CPC Club volunteer.</p>
         </aside>
@@ -69,7 +69,7 @@ export function CheckInPage() {
           </div>
           {camera.error && <p className="alert alert-error inspection-error" role="alert">{camera.error}</p>}
           {fullscreenError && <p className="alert alert-error inspection-error" role="alert">{fullscreenError}</p>}
-          <label className="checkbox-label inspection-acknowledgment"><input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} /><span>I have read and agree to follow the competition rules of Code Grand Prix. <a href="/#rules" target="_blank" rel="noreferrer">Review guidelines</a></span></label>
+          <label className="checkbox-label inspection-acknowledgment"><input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} /><span>I have read and agree to follow the competition rules of Code Grand Prix. <a href="/#rules" target="_blank" rel="noreferrer" aria-label="Review guidelines (opens in a new tab)">Review guidelines</a></span></label>
           <p className="inspection-privacy"><LockKeyhole size={12} /> Local preview only. Nothing is recorded or uploaded.<br /><span>Camera stays local through the lobby and arena. Sign out or leave the participant flow to stop it. Press Esc to exit fullscreen.</span></p>
         </div>
         <aside className="inspection-status-column readiness-panel">

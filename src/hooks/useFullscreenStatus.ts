@@ -14,5 +14,11 @@ export function useFullscreenStatus() {
       await document.documentElement.requestFullscreen()
     } catch { setError('Fullscreen could not be activated. Your draft is unchanged; try again in a supported desktop browser.') }
   }
-  return { active, error, activate }
+  async function toggle() {
+    if (!document.fullscreenElement) return activate()
+    setError('')
+    try { await document.exitFullscreen() }
+    catch { setError('Fullscreen could not be exited. Press Esc or retry from the browser controls.') }
+  }
+  return { active, error, activate, toggle }
 }

@@ -7,13 +7,13 @@ function hint(value:CandidateHint,problemId:string):CandidateHint{
  if(value.status==='UNLOCKED'){if(typeof value.content!=='string'||!value.content.trim())throw new Error('The unlocked hint is incomplete.');return {...metadata,status:'UNLOCKED',content:value.content}}
  return {...metadata,status:'LOCKED'}
 }
-export function parseHintState(value:HintState,problemId:string):HintState{
- if(!value||value.problemId!==problemId||typeof value.contestId!=='string'||!integer(value.configurationRevision)||!integer(value.maximumPoints)||!integer(value.totalHintPenalty)||!integer(value.remainingPotentialScore)||value.remainingPotentialScore>value.maximumPoints||!Array.isArray(value.hints))throw new Error('Hint response could not be verified. Refresh hint status to reconcile the request.')
+export function parseHintState(value:HintState,problemId:string,contestId?:string):HintState{
+ if(!value||value.problemId!==problemId||typeof value.contestId!=='string'||contestId&&value.contestId!==contestId||!integer(value.configurationRevision)||!integer(value.maximumPoints)||!integer(value.totalHintPenalty)||!integer(value.remainingPotentialScore)||value.remainingPotentialScore>value.maximumPoints||!Array.isArray(value.hints))throw new Error('Hint response could not be verified. Refresh hint status to reconcile the request.')
  const hints=value.hints.map(h=>hint(h,problemId));if(new Set(hints.map(h=>h.id)).size!==hints.length)throw new Error('Duplicate hint identifiers in service response.')
  return {contestId:value.contestId,problemId,configurationRevision:value.configurationRevision,maximumPoints:value.maximumPoints,totalHintPenalty:value.totalHintPenalty,remainingPotentialScore:value.remainingPotentialScore,hints}
 }
-export function parseHintUnlock(value:HintUnlockResult,problemId:string,hintId:string):HintUnlockResult{
- const state=parseHintState(value,problemId),unlocked=hint(value.hint,problemId)
+export function parseHintUnlock(value:HintUnlockResult,problemId:string,hintId:string,contestId?:string):HintUnlockResult{
+ const state=parseHintState(value,problemId,contestId),unlocked=hint(value.hint,problemId)
  if(unlocked.id!==hintId||unlocked.status!=='UNLOCKED'||!state.hints.some(h=>h.id===hintId&&h.status==='UNLOCKED')||!integer(value.deductionApplied)||typeof value.replayed!=='boolean')throw new Error('Unlock acknowledgment could not be verified. Refresh hint status before retrying.')
  return {...state,hint:unlocked,deductionApplied:value.deductionApplied,replayed:value.replayed}
 }

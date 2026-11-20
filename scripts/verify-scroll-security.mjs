@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import {browserQa} from './browser-qa.mjs'
 import {cpcDescription} from '../src/data/cpc.ts'
-const qa=await browserQa(),{send,evaluate,wait,go,click,clickText,screenshot,login,logout}=qa
+const qa=await browserQa(),{send,evaluate,wait,go,click,input,clickText,screenshot,login,logout}=qa
 const results=[]
 function pass(message){results.push(message);console.log('PASS '+message)}
 async function denied(path){await go(path);await wait("!!document.querySelector('.access-denied')");assert.ok(await evaluate("document.querySelector('.access-denied').textContent.includes('403')"),path)}
@@ -11,7 +11,7 @@ async function sectionLink(hash){await publicMenu();await click(`#main-navigatio
 try{
   await go('/login');await wait("!!document.querySelector('.login-preview-access')") // Refuse to run mutations against production.
   await evaluate("sessionStorage.clear();sessionStorage.setItem('cgp-brand-intro-v1','seen');sessionStorage.setItem('cgp-brand-intro-disabled','1')");await go('/')
-  for(const [width,height] of [[1920,1080],[1440,900],[1366,768],[768,1024],[390,844]]){
+  for(const [width,height] of [[1920,1080],[1440,900],[1366,768],[768,1024],[390,844],[320,568]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false})
     await send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]})
     await go('/#home');await wait('window.scrollY<2');await wait("!document.querySelector('.site-header').classList.contains('is-scrolled')")
@@ -50,7 +50,7 @@ try{
   assert.ok(Math.abs(cockpit.height-cockpit.viewport)<2);assert.ok(['auto','scroll'].includes(cockpit.statement));assert.ok(['auto','scroll'].includes(cockpit.editor))
   await evaluate("document.querySelector('.monitoring-dev-panel').open=true");await clickText('Simulate tab switch');await wait("document.querySelector('.violation-session-meta')?.textContent.includes('LOCKED') && !document.querySelector('.violation-session-meta')?.textContent.includes('LOCK PENDING')");assert.ok(await evaluate("getComputedStyle(document.querySelector('.violation-lock-backdrop')).zIndex>40"));assert.equal(await evaluate("document.querySelector('.arena-run-button').disabled"),true);pass('Candidate arena remains authorized, with independent native pane scrolling and a visible blocking session overlay')
   await logout();await login('VOLUNTEER2026','Marshal2026!');await wait("!!document.querySelector('.volunteer-body')");for(const path of ['/admin','/admin/questions','/admin/contests'])await denied(path)
-  await go('/volunteer/incidents');await wait("!!document.querySelector('.volunteer-body')");assert.equal(await evaluate("[...document.querySelectorAll('a')].some(a=>a.getAttribute('href')==='/admin'||a.getAttribute('href')?.startsWith('/admin/'))"),false);await clickText('Review incident');await wait("!!document.querySelector('.volunteer-review-card')");assert.ok(await evaluate("Number(getComputedStyle(document.querySelector('.volunteer-review-backdrop')).zIndex)>Number(getComputedStyle(document.querySelector('.volunteer-topbar')).zIndex)"));await clickText('AUTHORIZE RESUME');await wait("document.querySelector('.volunteer-confirmation')?.textContent.includes('authorization')");pass('Volunteer nested dashboard and incident authorization remain allowed; admin access and links remain blocked')
+  await go('/volunteer/incidents');await wait("!!document.querySelector('.volunteer-body')");assert.equal(await evaluate("[...document.querySelectorAll('a')].some(a=>a.getAttribute('href')==='/admin'||a.getAttribute('href')?.startsWith('/admin/'))"),false);await clickText('Review incident');await wait("!!document.querySelector('.volunteer-review-content')");assert.ok(await evaluate("Number(getComputedStyle(document.querySelector('.assist-dialog-backdrop')).zIndex)>Number(getComputedStyle(document.querySelector('.volunteer-topbar')).zIndex)"));await input('.volunteer-note-field textarea','Camera and fullscreen verified at station.');await clickText('AUTHORIZE RESUME');await wait("document.querySelector('.volunteer-confirmation')?.textContent.includes('authorization')");pass('Volunteer nested dashboard and incident authorization remain allowed; admin access and links remain blocked')
   await logout();await login('ADMIN2026','Control2026!');await wait("!!document.querySelector('.admin-kpis')")
   for(const [width,height] of [[1366,768],[390,844]]){
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});await go('/admin/questions');await wait("!!document.querySelector('.admin-table-wrap tbody tr')");await clickText('Add question');await wait("!!document.querySelector('.admin-form')");await evaluate("document.querySelector('.dashboard-route-shell>main').scrollTo({top:700,behavior:'instant'})");assert.ok(await evaluate("Math.abs(document.querySelector('.admin-topbar').getBoundingClientRect().top)<3"));assert.ok(await evaluate("document.querySelector('.dashboard-route-shell>main').scrollTop>100"));await screenshot(`phase4-2-admin-scroll-${width}x${height}`)

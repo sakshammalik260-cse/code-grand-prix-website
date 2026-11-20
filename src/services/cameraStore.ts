@@ -55,6 +55,7 @@ export const cameraStore = {
         return true
       } catch (error) {
         if (attempt !== generation) return false
+        cleanup(); snapshot.stream?.getTracks().forEach(track => track.stop())
         const name = error instanceof DOMException ? error.name : ''
         const message = name === 'NotAllowedError' ? 'Camera permission was denied. Allow camera access in site settings, then retry.' : name === 'NotFoundError' ? 'No camera found. Connect a camera and retry.' : name === 'NotReadableError' ? 'Camera may be in use by another app. Close it there and retry.' : error instanceof Error ? error.message : 'Unable to start the camera.'
         publish({ stream: null, status: name === 'NotAllowedError' ? 'PERMISSION_REQUIRED' : 'UNAVAILABLE', error: message })

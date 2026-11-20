@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { MonitoringClient } from '../services/monitoring/client'
 import { cameraStore } from '../services/cameraStore'
 import { sessionAllowsExecution } from '../services/monitoring/sessionRules'
 import type { ParticipantScope } from '../types/monitoring'
 
 export function useContestMonitoring(scope: ParticipantScope & { enabled: boolean; problemId: string }) {
-  const [client] = useState(() => new MonitoringClient(scope))
+  const client = useMemo(() => new MonitoringClient({ contestId: scope.contestId, driverId: scope.driverId }), [scope.contestId, scope.driverId])
   const state = useSyncExternalStore(client.subscribe,client.getSnapshot)
   const camera = useSyncExternalStore(cameraStore.subscribe,cameraStore.getSnapshot)
   useEffect(() => { client.start(); return () => client.stop() },[client])
@@ -54,8 +54,10 @@ export function useContestMonitoring(scope: ParticipantScope & { enabled: boolea
     }
     const pageLeaving = () => { leaving = true; clearTimeout(tabTimer); clearTimeout(focusTimer) }
     const pageRestored = () => { leaving = false; hidden = document.visibilityState === 'hidden'; fullscreen = !!document.fullscreenElement; cameraRevision = cameraStore.getSnapshot().interruptionRevision; lostFocus = false; armed = false; arm(); void client.refresh() }
+    const teardownCancelled = () => pageRestored()
     window.addEventListener('pageshow',pageRestored)
     window.addEventListener('beforeunload',pageLeaving); window.addEventListener('pagehide',pageLeaving)
+    window.addEventListener('cgp-session-teardown',pageLeaving); window.addEventListener('cgp-session-teardown-cancelled',teardownCancelled)
     const unsubscribeCamera = cameraStore.subscribe(checkCamera)
     const unsubscribeSession = client.subscribe(arm)
     document.addEventListener('visibilitychange',visibility)
@@ -64,7 +66,7 @@ export function useContestMonitoring(scope: ParticipantScope & { enabled: boolea
     const online = () => { void client.refresh() }
     window.addEventListener('online',online); window.addEventListener('offline',online)
     return () => {
-      clearTimeout(tabTimer); clearTimeout(focusTimer); window.removeEventListener('pageshow',pageRestored); window.removeEventListener('beforeunload',pageLeaving); window.removeEventListener('pagehide',pageLeaving); unsubscribeCamera(); unsubscribeSession()
+      clearTimeout(tabTimer); clearTimeout(focusTimer); window.removeEventListener('pageshow',pageRestored); window.removeEventListener('beforeunload',pageLeaving); window.removeEventListener('pagehide',pageLeaving); window.removeEventListener('cgp-session-teardown',pageLeaving); window.removeEventListener('cgp-session-teardown-cancelled',teardownCancelled); unsubscribeCamera(); unsubscribeSession()
       document.removeEventListener('visibilitychange',visibility); document.removeEventListener('fullscreenchange',fullscreenChange)
       window.removeEventListener('blur',blur); window.removeEventListener('focus',focus); window.removeEventListener('online',online); window.removeEventListener('offline',online)
     }

@@ -108,8 +108,8 @@ Before real judging, confirm runtime/language entry-point and input contracts wi
 
 Verified and visually inspected the user-supplied files:
 
-- `public/branding/cpc-mark-transparent.png`: navbar mark.
-- `public/branding/cpc-logo-transparent.png`: homepage organizer area and footer.
+- `public/branding/cpc-mark.webp`: optimized navbar mark.
+- `public/branding/cpc-logo.webp`: optimized homepage and footer logo.
 
 The original files and their white/neon-green colors are preserved. Images use meaningful alt text, original aspect ratio and object-fit contain. Code Grand Prix remains the primary event wordmark. The incorrect Coding & Programming Club placeholder is removed; club text and page metadata use **Competitive Programming Club**.
 

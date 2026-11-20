@@ -4,21 +4,21 @@ import { hintService } from '../../services/assist'
 import { parseHintState,parseHintUnlock } from '../../services/assist/contracts'
 import { RaceDialog } from './RaceDialog'
 import type { HintState,LockedHint } from '../../types/assist'
-interface Props {problemId:string;sessionId:string;allowed:boolean;onPenalty:()=>void}
-export function RaceAssist({problemId,sessionId,allowed,onPenalty}:Props){
+interface Props {contestId:string;problemId:string;sessionId:string;allowed:boolean;onPenalty:()=>void}
+export function RaceAssist({contestId,problemId,sessionId,allowed,onPenalty}:Props){
  const [state,setState]=useState<HintState|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[attempt,setAttempt]=useState(0),[target,setTarget]=useState<{hint:LockedHint;operationId:string;revision:number}|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('')
  const gate=useRef(false),alive=useRef(false),controller=useRef<AbortController|null>(null)
  const close=useCallback(()=>setTarget(null),[])
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;controller.current?.abort()}},[])
  useEffect(()=>{
-  const abort=new AbortController();hintService.get(problemId,abort.signal).then(value=>{if(!abort.signal.aborted){setState(parseHintState(value,problemId));setError('')}}).catch(reason=>{if(!abort.signal.aborted)setError(reason instanceof Error?reason.message:'Unable to load hints.')}).finally(()=>{if(!abort.signal.aborted)setLoading(false)})
+  const abort=new AbortController();hintService.get(problemId,abort.signal).then(value=>{if(!abort.signal.aborted){setState(parseHintState(value,problemId,contestId));setError('')}}).catch(reason=>{if(!abort.signal.aborted)setError(reason instanceof Error?reason.message:'Unable to load hints.')}).finally(()=>{if(!abort.signal.aborted)setLoading(false)})
   return()=>abort.abort()
- },[problemId,attempt])
+ },[contestId,problemId,attempt])
  async function unlock(){
   if(!target||!state||!allowed||gate.current)return
   gate.current=true;setBusy(true);setError('');setMessage('');controller.current=new AbortController()
   try{
-   const result=parseHintUnlock(await hintService.unlock(problemId,target.hint.id,{operationId:target.operationId,sessionId,configurationRevision:target.revision,expectedDeductionPoints:target.hint.deductionPoints},controller.current.signal),problemId,target.hint.id)
+    const result=parseHintUnlock(await hintService.unlock(problemId,target.hint.id,{operationId:target.operationId,sessionId,configurationRevision:target.revision,expectedDeductionPoints:target.hint.deductionPoints},controller.current.signal),problemId,target.hint.id,contestId)
    if(!alive.current)return
    setState(result);setTarget(null);setMessage(result.replayed?'Previously unlocked hint restored. No additional deduction.':`Hint unlocked. ${result.deductionApplied} points deducted from this problem\u2019s potential score.`);onPenalty()
   }catch(reason){if(alive.current)setError(reason instanceof Error?reason.message:'Unlock failed. Refresh hint status before retrying.')}

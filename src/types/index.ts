@@ -7,7 +7,7 @@ export interface CheckInRecord {
   rulesAccepted: boolean
   fullscreenVerified: boolean
 }
-export type LobbyState = 'waiting' | 'live' | 'finished'
+export type LobbyState = 'waiting' | 'live' | 'paused' | 'finished'
 export interface LoginCredentials { driverId: string; password: string }
 
 export * from './arena'

@@ -7,8 +7,10 @@ import { isDevelopmentMock } from '../services/mode'
 import { roleHome } from '../services/access'
 import { useSession } from '../hooks/useSession'
 import { CheckeredFlag, RaceWordmark } from '../components/RacingIdentity'
+import { LoadingState } from '../components/Ui'
 
 const DevelopmentAccounts = import.meta.env.DEV ? lazy(()=>import('../components/DevelopmentAccounts')) : null
+const within = (path: string | undefined, root: string) => path === root || path?.startsWith(root + '/')
 
 export function LoginPage() {
   const { driver, loading:authLoading, authError, signIn } = useSession()
@@ -23,7 +25,7 @@ export function LoginPage() {
   const driverIdInput = useRef<HTMLInputElement>(null)
   const passwordInput = useRef<HTMLInputElement>(null)
   const [postLoginTarget, setPostLoginTarget] = useState('')
-  if(authLoading)return <div className="arena-load-screen" role="status">Verifying your account...</div>
+  if(authLoading)return <LoadingState label="Verifying your paddock pass" detail="Restoring your championship session." />
   if (driver) return <Navigate to={postLoginTarget || roleHome(driver.role)} replace />
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -36,7 +38,7 @@ export function LoginPage() {
       return
     }
     setLoading(true)
-    try { const account=await authService.login({ driverId, password }); const from=(location.state as {from?:string})?.from; const allowed=account.role==='ADMIN'?from?.startsWith('/admin') || from?.startsWith('/volunteer') || from==='/results':account.role==='VOLUNTEER'?from?.startsWith('/volunteer'):from?.startsWith('/check-in') || from==='/results'; const target=allowed && from?from:roleHome(account.role); setPostLoginTarget(target); signIn(account); navigate(target, { replace: true }) }
+    try { const account=await authService.login({ driverId, password }); const from=(location.state as {from?:string})?.from; const allowed=account.role==='ADMIN'?within(from,'/admin') || within(from,'/volunteer') || from==='/results':account.role==='VOLUNTEER'?within(from,'/volunteer'):from==='/check-in' || from==='/results'; const target=allowed && from?from:roleHome(account.role); setPostLoginTarget(target); signIn(account); navigate(target, { replace: true }) }
     catch (err) { setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.') }
     finally { setLoading(false) }
   }

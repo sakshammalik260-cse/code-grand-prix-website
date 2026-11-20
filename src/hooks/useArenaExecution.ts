@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { arenaServices } from '../services/arena'
-import { delay, errorMessage, isAbort } from '../services/arena/mockState'
+import { delay, errorMessage, isAbort } from '../services/async'
 import type { CodeExecutionRequest, CodeExecutionResult, SubmissionRequest, SubmissionResult } from '../types/arena'
 
-interface Options { request: CodeExecutionRequest; allowed: boolean; onBusyChange: (value: boolean) => void; onProgress: (signal?: AbortSignal) => Promise<void> }
-export function useArenaExecution({ request, allowed, onBusyChange, onProgress }: Options) {
+interface Options { request: CodeExecutionRequest; allowed: boolean; simulation: boolean; onBusyChange: (value: boolean) => void; onProgress: (signal?: AbortSignal) => Promise<void> }
+const submissionStatuses=new Set(['QUEUED','RUNNING','ACCEPTED','WRONG_ANSWER','COMPILATION_ERROR','RUNTIME_ERROR','TIME_LIMIT_EXCEEDED','MEMORY_LIMIT_EXCEEDED'])
+const languageIds=new Set(['python','java','cpp','javascript'])
+function readHistory(key:string,scope:CodeExecutionRequest,simulation:boolean):SubmissionResult[]{try{const value:unknown=JSON.parse(sessionStorage.getItem(key)||'[]');if(!Array.isArray(value))return[];return value.filter((item):item is SubmissionResult=>{if(!item||typeof item!=='object')return false;const record=item as SubmissionResult;return typeof record.id==='string'&&record.contestId===scope.contestId&&record.driverId===scope.driverId&&record.problemId===scope.problemId&&record.language===scope.language&&languageIds.has(record.language)&&submissionStatuses.has(record.status)&&typeof record.submittedAt==='string'&&Number.isFinite(Date.parse(record.submittedAt))&&record.simulation===simulation&&!simulation&&['QUEUED','RUNNING'].includes(record.status)}).map(item=>({id:item.id,contestId:item.contestId,driverId:item.driverId,problemId:item.problemId,language:item.language,status:item.status,submittedAt:item.submittedAt,simulation:item.simulation})).slice(0,20)}catch{return[]}}
+export function useArenaExecution({ request, allowed, simulation, onBusyChange, onProgress }: Options) {
+  const historyKey=`cgp-arena-submissions-v1:${request.contestId}:${request.driverId}:${request.problemId}:${request.language}`
   const [operation, setOperation] = useState<'run' | 'submit' | null>(null)
   const [lastAction, setLastAction] = useState<'run' | 'submit' | null>(null)
   const [runResult, setRunResult] = useState<CodeExecutionResult | null>(null)
-  const [submission, setSubmission] = useState<SubmissionResult | null>(null)
+  const [submission, setSubmission] = useState<SubmissionResult | null>(()=>readHistory(historyKey,request,simulation)[0]||null)
   const [submitting, setSubmitting] = useState(false)
-  const [history, setHistory] = useState<SubmissionResult[]>([])
+  const [history, setHistory] = useState<SubmissionResult[]>(()=>readHistory(historyKey,request,simulation))
   const [error, setError] = useState('')
   const controller = useRef<AbortController | null>(null)
   const locked = useRef(false)
@@ -21,8 +25,8 @@ export function useArenaExecution({ request, allowed, onBusyChange, onProgress }
   }, [onBusyChange])
   const remember = useCallback((value: SubmissionResult) => {
     setSubmission(value)
-    setHistory(previous => [value, ...previous.filter(item => item.id !== value.id)].slice(0,20))
-  }, [])
+    setHistory(previous => {const next=[value, ...previous.filter(item => item.id !== value.id)].slice(0,20);try{sessionStorage.setItem(historyKey,JSON.stringify(next))}catch{/* Keep history in memory when storage is unavailable. */}return next})
+  }, [historyKey])
   const poll = useCallback(async (initial: SubmissionResult, signal: AbortSignal) => {
     let value = initial
     for (let attempt = 0; (value.status === 'QUEUED' || value.status === 'RUNNING') && attempt < 80; attempt++) {

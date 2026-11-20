@@ -5,6 +5,7 @@ import { SessionContext } from './session'
 import { event } from '../data/event'
 import { authService } from '../services/auth'
 import { isDevelopmentMock } from '../services/mode'
+import { cameraStore } from '../services/cameraStore'
 const receiptKey = `cgp-demo-check-in-v1:${event.contestId}`
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [driver,setDriver]=useState<Driver | null>(null)
@@ -32,11 +33,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if(isDevelopmentMock)try{sessionStorage.setItem(receiptKey,JSON.stringify(record))}catch{/* Memory receipt. */}
   }
   function signOut() {
+    setAuthError('')
+    window.dispatchEvent(new Event('cgp-session-teardown'))
+    cameraStore.release()
+    if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{})
     void authService.logout().then(()=>{
       setDriver(null);setCheckIn(null);setAuthError('')
       try{sessionStorage.removeItem(receiptKey)}catch{/* Memory session cleared. */}
-      if(document.fullscreenElement)void document.exitFullscreen().catch(()=>{})
-    }).catch(error=>setAuthError(error instanceof Error?error.message:'Sign out failed. Retry.'))
+    }).catch(error=>{window.dispatchEvent(new Event('cgp-session-teardown-cancelled'));setAuthError(error instanceof Error?error.message:'Sign out failed. Retry.')})
   }
   return <SessionContext.Provider value={{driver,checkIn,loading,authError,signIn,signOut,completeCheckIn}}>{children}</SessionContext.Provider>
 }

@@ -1,11 +1,38 @@
-import type { ReactNode } from 'react'
-import { Check, ChevronRight } from 'lucide-react'
-export function Badge({ children, tone = 'red' }: { children: ReactNode; tone?: 'red' | 'green' | 'yellow' | 'neutral' }) {
-  return <span className={`badge badge-${tone}`}><span className="status-dot" />{children}</span>
+import { useId, type ReactNode } from 'react'
+import { LoaderCircle } from 'lucide-react'
+
+type StatusTone = 'accent' | 'live' | 'caution' | 'neutral' | 'critical'
+type HeadingLevel = 'h1' | 'h2' | 'h3'
+
+export function TelemetryLabel({ children }: { children: ReactNode }) {
+  return <span className="telemetry-label">{children}</span>
 }
-export function PageHeading({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return <div className="page-heading"><div className="eyebrow"><span />{eyebrow}</div><h1>{title}</h1><p>{description}</p></div>
+
+export function StatusIndicator({ children, tone = 'accent' }: { children: ReactNode; tone?: StatusTone }) {
+  return <span className="status-indicator" data-tone={tone}>{children}</span>
 }
-export function Steps({ current }: { current: number }) {
-  return <ol className="steps" aria-label="Entry progress">{['Driver login', 'Pre-race check', 'Race lobby'].map((name, index) => <li key={name} className={current === index + 1 ? 'current' : current > index + 1 ? 'done' : ''} aria-current={current === index + 1 ? 'step' : undefined}><span>{current > index + 1 ? <Check size={13} /> : `0${index + 1}`}</span>{name}{index < 2 && <ChevronRight size={14} />}</li>)}</ol>
+
+export function SectionHeading({ eyebrow, title, description, level = 'h2', align = 'start', className = '', headingId }: { eyebrow: string; title: ReactNode; description?: ReactNode; level?: HeadingLevel; align?: 'start' | 'center'; className?: string; headingId?: string }) {
+  const Heading = level
+  return <div className={`section-heading ${className}`.trim()} data-align={align}>
+    <TelemetryLabel>{eyebrow}</TelemetryLabel>
+    <Heading id={headingId}>{title}</Heading>
+    {description && <p>{description}</p>}
+  </div>
+}
+
+export function LoadingState({ label, detail }: { label: string; detail?: string }) {
+  return <div className="arena-load-screen race-loading race-panel" role="status" aria-live="polite">
+    <LoaderCircle size={28} aria-hidden="true" />
+    <div><strong>{label}</strong>{detail && <span>{detail}</span>}</div>
+  </div>
+}
+
+export function StatePanel({ eyebrow, title, description, icon, action, tone = 'neutral', className = '' }: { eyebrow: string; title: ReactNode; description: ReactNode; icon?: ReactNode; action?: ReactNode; tone?: 'neutral' | 'critical'; className?: string }) {
+  const headingId = useId()
+  return <section className={`race-state race-panel ${className}`.trim()} data-tone={tone} aria-labelledby={headingId} role={tone === 'critical' ? 'alert' : undefined}>
+    {icon && <span className="race-state-icon" aria-hidden="true">{icon}</span>}
+    <SectionHeading eyebrow={eyebrow} title={title} description={description} level="h1" align="center" className="race-state-heading" headingId={headingId} />
+    {action && <div className="race-state-actions">{action}</div>}
+  </section>
 }
