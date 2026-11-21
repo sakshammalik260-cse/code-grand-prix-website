@@ -268,7 +268,7 @@ summary {
   .assist-secondary,
   .volunteer-review-button
 ):not(:disabled):is(:hover, :focus-visible)::before {
-  animation: cgp-checkered-pass .56s var(--cgp-ease-enter) both;
+  animation: cgp-checkered-pass .8s var(--cgp-ease-enter) both;
 }
 
 :where(

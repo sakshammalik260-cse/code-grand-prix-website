@@ -281,10 +281,10 @@ html.brand-intro-active body {
 .brand-intro-launch span:nth-child(1) { background: var(--cgp-red, #f20d18); }
 .brand-intro-launch span:nth-child(2) { margin-left: -7vw; background: conic-gradient(from 90deg, #f2f3f5 25%, #090a0d 0 50%, #f2f3f5 0 75%, #090a0d 0) 0 0 / 2.5rem 2.5rem; }
 .brand-intro-launch span:nth-child(3) { width: 5vw; margin-left: 46vw; background: white; box-shadow: 0 0 26px white; }
-.brand-intro.is-exiting:not(.is-fast-exit) .brand-intro-launch span { animation: brand-launch-wipe .55s var(--cgp-ease-enter, ease-out) forwards; }
+.brand-intro.is-exiting:not(.is-fast-exit) .brand-intro-launch span { animation: brand-launch-wipe 1.2s var(--cgp-ease-enter, ease-out) forwards; }
 .brand-intro.is-exiting:not(.is-fast-exit) .brand-intro-launch span:nth-child(2) { animation-delay: .035s; }
 .brand-intro.is-exiting:not(.is-fast-exit) .brand-intro-launch span:nth-child(3) { animation-delay: .07s; }
-.brand-intro.is-exiting { animation: brand-intro-out .56s ease-in forwards; }
+.brand-intro.is-exiting { animation: brand-intro-out 1.3s ease-in forwards; }
 .brand-intro.is-fast-exit { animation: brand-intro-fast-out .14s ease-out forwards; }
 
 .brand-intro-skip {

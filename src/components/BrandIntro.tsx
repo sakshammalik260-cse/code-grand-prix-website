@@ -61,7 +61,7 @@ export function BrandIntro({ children }: { children: ReactNode }) {
       setVisible(false)
       document.documentElement.classList.remove('brand-intro-active')
       window.requestAnimationFrame(() => document.getElementById('main')?.focus({ preventScroll: true }))
-    }, immediate || reducedMotion ? 140 : 560)
+    }, immediate || reducedMotion ? 140 : 1320)
     timers.current.push(timer)
   }, [clearTimers, reducedMotion])
 
