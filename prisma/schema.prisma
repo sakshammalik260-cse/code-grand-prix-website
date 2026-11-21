@@ -139,11 +139,30 @@ model Contest {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
+  rounds         CompetitionRound[]
   sessions       Session[]
   problems       Problem[]
   hintReceipts   HintReceipt[]
 
   @@map("contests")
+}
+
+model CompetitionRound {
+  id               String        @id
+  contestId        String
+  title            String
+  status           ContestStatus @default(WAITING)
+  startsAt         DateTime
+  endsAt           DateTime
+  questionsVisible Boolean       @default(true)
+  resultsVisible   Boolean       @default(false)
+
+  contest  Contest   @relation(fields: [contestId], references: [id], onDelete: Restrict)
+  problems Problem[]
+
+  @@unique([id, contestId])
+  @@index([contestId, startsAt])
+  @@map("competition_rounds")
 }
 
 model Session {
@@ -176,6 +195,8 @@ model Session {
 model Problem {
   id                     String        @id @default(uuid())
   contestId              String
+  roundId                String?
+  publishAt              DateTime?
   slug                   String        @unique
   title                  String
   difficulty             Difficulty
@@ -196,12 +217,14 @@ model Problem {
   updatedAt              DateTime      @updatedAt
 
   contest                Contest       @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  round                  CompetitionRound? @relation(fields: [roundId, contestId], references: [id, contestId], onDelete: Restrict, onUpdate: Restrict)
   testCases              TestCase[]
   submissions            Submission[]
   drafts                 Draft[]
   hints                  Hint[]
   hintReceipts           HintReceipt[]
 
+  @@index([contestId, roundId, order])
   @@map("problems")
 }
 
@@ -212,7 +235,7 @@ model TestCase {
   expectedOutput String   @db.Text
   isPublic       Boolean  @default(false) // Public sample test vs Hidden private test
   explanation    String?  @db.Text
-  weight         Int?     @default(1)
+  weight         Float?   @default(1)
   order          Int      @default(1)
   createdAt      DateTime @default(now())
 
@@ -307,6 +330,7 @@ model Incident {
 
 model AuditLog {
   id            String    @id @default(uuid())
+  idempotencyKey String?   @unique
   volunteerId   String
   incidentId    String?
   participantId String?

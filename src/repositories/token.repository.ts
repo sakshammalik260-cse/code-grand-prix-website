@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — TOKEN REVOCATION REPOSITORY
 // ==============================================================================
@@ -21,8 +22,8 @@ export class TokenRepository {
           expiresAt
         }
       });
-    } catch {
-      // In-memory fallback is active if DB is unreachable
+    } catch (error) {
+      if (env.NODE_ENV === "production") throw error;
     }
   }
 
@@ -42,8 +43,8 @@ export class TokenRepository {
         inMemoryRevokedTokens.add(token);
         return true;
       }
-    } catch {
-      // If DB fails, rely on in-memory set
+    } catch (error) {
+      if (env.NODE_ENV === "production") throw error;
     }
 
     return false;

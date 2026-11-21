@@ -10,7 +10,7 @@ import { ERROR_CODES } from "../constants/index.js";
 import { AppError } from "../middleware/error.middleware.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
-import { ContestRepository } from "../repositories/contest.repository.js";
+import { RoundService } from "./round.service.js";
 import { TokenRepository } from "../repositories/token.repository.js";
 import { Role } from "@prisma/client";
 
@@ -46,9 +46,8 @@ export class AuthService {
       );
     }
 
-    const contest = await ContestRepository.getContest(env.CONTEST_ID);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
-    const session = await SessionRepository.findOrCreate(user.id, contest.id);
+    const timeDetails = await RoundService.clock(env.CONTEST_ID);
+    const session = await SessionRepository.findOrCreate(user.id, timeDetails.id);
 
     const jti = uuidv4();
     const token = jwt.sign(
@@ -56,7 +55,7 @@ export class AuthService {
         userId: user.id,
         driverId: user.driverId,
         role: user.role,
-        contestId: contest.id,
+        contestId: timeDetails.id,
         jti
       },
       env.JWT_SECRET,
@@ -81,7 +80,7 @@ export class AuthService {
         role: normalizedRole
       },
       contest: {
-        id: contest.id,
+        id: timeDetails.id,
         status: timeDetails.status
       },
       session: {

@@ -27,6 +27,7 @@ export async function connectDatabase(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error("❌ Failed to connect to PostgreSQL database:", error);
+    if (env.NODE_ENV === "production") throw error;
     return false;
   }
 }

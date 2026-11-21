@@ -8,11 +8,11 @@ import { VERDICTS, VerdictType, ERROR_CODES } from "../constants/index.js";
 import { AppError } from "../middleware/error.middleware.js";
 import { IJudgeAdapter } from "./judge.interface.js";
 import { LocalSandboxJudge } from "./local.sandbox.js";
-import { Judge0Adapter } from "./judge0.adapter.js";
+import { Judge0Adapter, JudgeUnavailable } from "./judge0.adapter.js";
 import { ProblemRepository } from "../repositories/problem.repository.js";
 import { SubmissionRepository } from "../repositories/submission.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
-import { ContestRepository } from "../repositories/contest.repository.js";
+import { RoundService } from "../services/round.service.js";
 import { SubmissionStatus, Verdict, CheckinStatus, RaceSessionStatus } from "@prisma/client";
 
 export interface RunCodeInput {
@@ -36,6 +36,55 @@ export interface SubmitCodeInput {
   sourceCode: string;
 }
 
+function canonicalLanguage(value: string) {
+  const language = value.trim().toLowerCase();
+  if (language === "js" || language === "nodejs") return "javascript";
+  if (language === "python3") return "python";
+  if (language === "c++") return "cpp";
+  return language;
+}
+
+const candidateRequests = new Set<string>();
+
+async function withJudgeSlot<T>(userId: string, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  if (candidateRequests.has(userId)) {
+    throw new AppError(429, ERROR_CODES.JUDGE_BUSY, "Wait for your current code execution to finish.");
+  }
+  if (candidateRequests.size >= env.JUDGE_MAX_CONCURRENT_REQUESTS) {
+    throw new AppError(503, ERROR_CODES.JUDGE_BUSY, "The judge is busy. Try again shortly.");
+  }
+  candidateRequests.add(userId);
+  try {
+    return await work(AbortSignal.timeout(env.JUDGE_REQUEST_TIMEOUT_MS));
+  } catch (error) {
+    if (error instanceof JudgeUnavailable) console.warn("[Judge] Execution unavailable", { stage: error.stage });
+    throw error;
+  } finally {
+    candidateRequests.delete(userId);
+  }
+}
+
+async function executeCase(adapter: IJudgeAdapter, request: Parameters<IJudgeAdapter["execute"]>[0]) {
+  if (request.signal?.aborted) throw new JudgeUnavailable("request-deadline");
+  try {
+    const result = await adapter.execute(request);
+    if (result.status === VERDICTS.INTERNAL_ERROR || result.status === VERDICTS.QUEUED ||
+        result.status === VERDICTS.RUNNING) throw new JudgeUnavailable("nonterminal-result");
+    return result;
+  } catch (error) {
+    if (error instanceof JudgeUnavailable) throw error;
+    throw new JudgeUnavailable("adapter-execution");
+  }
+}
+
+function validateCases(cases: { input: string; expectedOutput: string }[]) {
+  if (!cases.length || cases.length > env.JUDGE_MAX_CASES || cases.some(test =>
+    Buffer.byteLength(test.input) > env.MAX_CUSTOM_INPUT_BYTES ||
+    Buffer.byteLength(test.expectedOutput) > env.MAX_OUTPUT_BYTES)) {
+    throw new JudgeUnavailable("case-configuration");
+  }
+}
+
 export class JudgeService {
   private static adapter: IJudgeAdapter;
 
@@ -49,6 +98,9 @@ export class JudgeService {
       );
     }
 
+    if (env.JUDGE_PROVIDER === "local" && env.NODE_ENV !== "test" && !env.ALLOW_TRUSTED_LOCAL_JUDGE) {
+      throw new JudgeUnavailable("trusted-local-disabled");
+    }
     if (!this.adapter) {
       if (env.JUDGE_PROVIDER === "judge0") {
         this.adapter = new Judge0Adapter();
@@ -80,8 +132,7 @@ export class JudgeService {
     customInput?: string
   ) {
     // 1. Contest Gate
-    const contest = await ContestRepository.getContest(contestId);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
+    const timeDetails = await RoundService.clock(contestId);
     if (timeDetails.status !== "LIVE") {
       throw new AppError(
         409,
@@ -113,6 +164,10 @@ export class JudgeService {
       );
     }
 
+    if (session.status !== RaceSessionStatus.ACTIVE && session.status !== RaceSessionStatus.RESUME_AUTHORIZED) {
+      throw new AppError(403, ERROR_CODES.SESSION_LOCKED, "This session is not active.");
+    }
+
     // 3. Problem Gate (C07 Fix: Must be strictly PUBLISHED)
     const problem = await ProblemRepository.findByIdWithAllTests(problemId, true);
     if (!problem) {
@@ -137,7 +192,7 @@ export class JudgeService {
     }
 
     // 5. Payload Size Caps
-    if (sourceCode.length > env.MAX_SOURCE_CODE_BYTES) {
+    if (Buffer.byteLength(sourceCode, "utf8") > env.MAX_SOURCE_CODE_BYTES) {
       throw new AppError(
         400,
         ERROR_CODES.VALIDATION_ERROR,
@@ -145,7 +200,7 @@ export class JudgeService {
       );
     }
 
-    if (customInput && customInput.length > env.MAX_CUSTOM_INPUT_BYTES) {
+    if (customInput && Buffer.byteLength(customInput, "utf8") > env.MAX_CUSTOM_INPUT_BYTES) {
       throw new AppError(
         400,
         ERROR_CODES.VALIDATION_ERROR,
@@ -153,15 +208,19 @@ export class JudgeService {
       );
     }
 
-    return { problem, session, contest };
+    return { problem, session };
   }
 
   /**
    * Run Code against public sample cases or custom input
    */
-  static async runCode(userId: string, input: RunCodeInput) {
-    const contestId = input.contestId || env.CONTEST_ID;
-    const language = (input.language || input.languageId || "").toLowerCase();
+  static runCode(userId: string, input: RunCodeInput) {
+    return withJudgeSlot(userId, signal => this.run(userId, input, signal));
+  }
+
+  private static async run(userId: string, input: RunCodeInput, signal: AbortSignal) {
+    const contestId = env.CONTEST_ID;
+    const language = canonicalLanguage(input.language || input.languageId || "");
     const { problem } = await this.validateExecutionGates(
       userId,
       contestId,
@@ -176,7 +235,8 @@ export class JudgeService {
 
     // Case A: Custom Input Execution
     if (input.customInput !== undefined && input.customInput !== null) {
-      const exec = await adapter.execute({
+      const exec = await executeCase(adapter, {
+        signal,
         language,
         sourceCode: input.sourceCode,
         stdin: input.customInput,
@@ -211,6 +271,7 @@ export class JudgeService {
 
     // Case B: Public Sample Cases Execution
     const publicCases = problem.testCases.filter((tc) => tc.isPublic);
+    validateCases(publicCases);
     const caseResults = [];
     let overallStatus: VerdictType = VERDICTS.ACCEPTED;
     let maxRuntime = 0;
@@ -221,7 +282,8 @@ export class JudgeService {
 
     for (let i = 0; i < publicCases.length; i++) {
       const tc = publicCases[i];
-      const exec = await adapter.execute({
+      const exec = await executeCase(adapter, {
+        signal,
         language,
         sourceCode: input.sourceCode,
         stdin: tc.input,
@@ -282,10 +344,14 @@ export class JudgeService {
   /**
    * Submit Code against private hidden test cases and persist official verdict
    */
-  static async submitCode(userId: string, trustedDriverId: string, input: SubmitCodeInput) {
-    const contestId = input.contestId || env.CONTEST_ID;
-    const language = (input.language || input.languageId || "").toLowerCase();
-    const { problem } = await this.validateExecutionGates(
+  static submitCode(userId: string, driverId: string, input: SubmitCodeInput) {
+    return withJudgeSlot(userId, signal => this.submit(userId, driverId, input, signal));
+  }
+
+  private static async submit(userId: string, trustedDriverId: string, input: SubmitCodeInput, signal: AbortSignal) {
+    const contestId = env.CONTEST_ID;
+    const language = canonicalLanguage(input.language || input.languageId || "");
+    const { problem, session } = await this.validateExecutionGates(
       userId,
       contestId,
       input.problemId,
@@ -293,15 +359,19 @@ export class JudgeService {
       input.sourceCode
     );
 
-    // Create Submission record
+    // Validate the judging configuration before creating a queued record.
+    if (!problem.testCases.some(test => !test.isPublic)) {
+      throw new AppError(409, ERROR_CODES.VALIDATION_ERROR,
+        "This problem has no hidden judging tests. Contact the contest administrator.");
+    }
+    validateCases(problem.testCases);
+    const adapter = this.getAdapter();
     const submission = await SubmissionRepository.create({
       userId,
       problemId: problem.id,
       languageId: language,
       sourceCode: input.sourceCode
-    });
-
-    const adapter = this.getAdapter();
+    }, problem.revision, session.id);
     const allCases = problem.testCases;
     let passedTests = 0;
     let finalVerdict: VerdictType = VERDICTS.ACCEPTED;
@@ -309,49 +379,39 @@ export class JudgeService {
     let maxMemory = 0;
     let message = "All test cases passed.";
 
-    for (let i = 0; i < allCases.length; i++) {
-      const tc = allCases[i];
-      const exec = await adapter.execute({
-        language,
-        sourceCode: input.sourceCode,
-        stdin: tc.input,
-        timeLimitMs: problem.timeLimitMs,
-        memoryLimitMb: problem.memoryLimitMb
-      });
-
-      maxRuntime = Math.max(maxRuntime, exec.runtimeMs);
-      maxMemory = Math.max(maxMemory, exec.memoryKb);
-
-      if (exec.status === VERDICTS.COMPILATION_ERROR) {
-        finalVerdict = VERDICTS.COMPILATION_ERROR;
-        message = "Compilation error occurred.";
-        break;
-      }
-
-      if (exec.status === VERDICTS.TIME_LIMIT_EXCEEDED) {
-        finalVerdict = VERDICTS.TIME_LIMIT_EXCEEDED;
-        message = `Time limit exceeded (${problem.timeLimitMs}ms).`;
-        break;
-      }
-
-      if (exec.status === VERDICTS.RUNTIME_ERROR) {
-        finalVerdict = VERDICTS.RUNTIME_ERROR;
-        message = "Runtime error occurred during execution.";
-        break;
-      }
-
-      const studentNorm = this.normalizeOutput(exec.stdout);
-      const expectedNorm = this.normalizeOutput(tc.expectedOutput);
-
-      if (studentNorm === expectedNorm) {
+    try {
+      for (const [index, test] of allCases.entries()) {
+        const exec = await executeCase(adapter, {
+          signal, language, sourceCode: input.sourceCode, stdin: test.input,
+          timeLimitMs: problem.timeLimitMs, memoryLimitMb: problem.memoryLimitMb
+        });
+        maxRuntime = Math.max(maxRuntime, exec.runtimeMs);
+        maxMemory = Math.max(maxMemory, exec.memoryKb);
+        if (exec.status !== VERDICTS.ACCEPTED) {
+          finalVerdict = exec.status;
+          const messages = {
+            COMPILATION_ERROR: "Compilation error occurred.",
+            TIME_LIMIT_EXCEEDED: "Time limit exceeded.",
+            MEMORY_LIMIT_EXCEEDED: "Memory limit exceeded.",
+            RUNTIME_ERROR: "Runtime error occurred during execution.",
+            WRONG_ANSWER: "Wrong answer."
+          };
+          message = messages[exec.status as keyof typeof messages] ?? "Execution failed.";
+          break;
+        }
+        if (this.normalizeOutput(exec.stdout) !== this.normalizeOutput(test.expectedOutput)) {
+          finalVerdict = VERDICTS.WRONG_ANSWER;
+          message = test.isPublic ? `Wrong answer on sample test ${index + 1}.` : "Wrong answer on private test.";
+          break;
+        }
         passedTests++;
-      } else {
-        finalVerdict = VERDICTS.WRONG_ANSWER;
-        message = tc.isPublic
-          ? `Wrong answer on sample test ${i + 1}.`
-          : "Wrong answer on private test.";
-        break;
       }
+    } catch (error) {
+      await SubmissionRepository.updateVerdict(submission.id, {
+        status: SubmissionStatus.FAILED, verdict: Verdict.INTERNAL_ERROR, score: 0,
+        passedTests, totalTests: allCases.length, message: "Isolated judge unavailable. No score awarded."
+      });
+      throw error;
     }
 
     const score = finalVerdict === VERDICTS.ACCEPTED ? problem.points : 0;

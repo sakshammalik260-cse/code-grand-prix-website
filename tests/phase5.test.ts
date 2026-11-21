@@ -3,6 +3,8 @@
 // ==============================================================================
 
 import http from "http";
+import { assertIsolatedDatabase } from "./isolation.js";
+import { prisma } from "../src/config/database.js";
 import { createApp } from "../src/app.js";
 import { AddressInfo } from "net";
 
@@ -72,6 +74,7 @@ function makeRequest(
 }
 
 async function runTests() {
+  assertIsolatedDatabase();
   console.log("====================================================");
   console.log("🛡️  STARTING PHASE 5 INCIDENTS, RACE CONTROL & HINTS TEST SUITE");
   console.log("====================================================\n");
@@ -79,7 +82,8 @@ async function runTests() {
   const app = createApp();
   const server = http.createServer(app);
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
     server.listen(0, "127.0.0.1", () => resolve());
   });
 
@@ -93,6 +97,7 @@ async function runTests() {
       console.log(`  ✅ PASS: ${testName}`);
     } else {
       console.error(`  ❌ FAIL: ${testName}`);
+      process.exitCode = 1;
       if (details) console.error(`     Details: ${details}`);
     }
   }
@@ -240,7 +245,9 @@ async function runTests() {
 
     // Test 2.4: Atomic One-Action Bulk Session Resume
     const candidateSession = participantsRes.body.find((p: any) => p.driverId === "CGP2026");
-    const sessionId = candidateSession?.id || "sess_u_cgp2026_cgp_2026";
+    assert(candidateSession?.status === "LOCKED" && Number.isInteger(candidateSession.revision),
+      "Staff receives the locked session and its current revision");
+    const sessionId = candidateSession.id;
 
     const bulkResumeRes = await makeRequest(
       server,
@@ -249,7 +256,8 @@ async function runTests() {
       {
         decision: "AUTHORIZE_RESUME",
         note: "Volunteer inspected video stream and confirmed innocent tab switch.",
-        idempotencyKey: "approval-test-001"
+        idempotencyKey: "approval-test-001",
+        expectedSessionRevision: candidateSession.revision
       },
       volunteerToken
     );
@@ -419,9 +427,11 @@ async function runTests() {
     console.log(`🏁 PHASE 5 TEST RESULTS: ${testsPassed} / ${testsTotal} PASSED`);
     console.log("====================================================\n");
   } catch (error) {
+    process.exitCode = 1;
     console.error("❌ Unexpected test execution error:", error);
   } finally {
-    server.close();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    await prisma.$disconnect();
   }
 }
 

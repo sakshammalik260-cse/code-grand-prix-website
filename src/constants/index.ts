@@ -8,6 +8,8 @@ export const ERROR_CODES = {
   FORBIDDEN_ROLE: "FORBIDDEN_ROLE",
   CHECKIN_INCOMPLETE: "CHECKIN_INCOMPLETE",
   SESSION_LOCKED: "SESSION_LOCKED",
+  JUDGE_UNAVAILABLE: "JUDGE_UNAVAILABLE",
+  JUDGE_BUSY: "JUDGE_BUSY",
   CONTEST_NOT_LIVE: "CONTEST_NOT_LIVE",
   RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
   VALIDATION_ERROR: "VALIDATION_ERROR",
@@ -45,7 +47,7 @@ export const SUPPORTED_LANGUAGES = [
     label: "Java (OpenJDK 17)",
     version: "17",
     extension: ".java",
-    starterCode: `// Java 17 Starter Code\nimport java.util.Scanner;\n\npublic class Solution {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        // Write your solution here\n    }\n}\n`
+    starterCode: `// Java Starter Code (Judge0 entry class)\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        // Write your solution here\n    }\n}\n`
   }
 ] as const;
 

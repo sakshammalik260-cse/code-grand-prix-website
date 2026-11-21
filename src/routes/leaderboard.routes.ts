@@ -13,6 +13,13 @@ leaderboardRouter.get("/leaderboard", LeaderboardController.getLeaderboard);
 leaderboardRouter.get("/contest/progress", requireAuth, LeaderboardController.getProgress);
 leaderboardRouter.get("/contest/results/visibility", LeaderboardController.getVisibility);
 
+leaderboardRouter.get(
+  "/admin/results/visibility",
+  requireAuth,
+  requireRole([Role.ADMIN]),
+  LeaderboardController.getContestVisibility
+);
+
 // Admin toggle for leaderboard visibility
 leaderboardRouter.post(
   "/admin/results/visibility",

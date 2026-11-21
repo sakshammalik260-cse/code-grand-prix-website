@@ -16,7 +16,8 @@ async function bootstrap() {
   // Attempt database connection (non-fatal if DB is offline during initial local setup)
   await connectDatabase();
 
-  server.listen(env.PORT, () => {
+  const bindAddress = env.JUDGE_PROVIDER === "local" ? "127.0.0.1" : undefined;
+  server.listen({ port: env.PORT, host: bindAddress }, () => {
     console.log(`====================================================`);
     console.log(`🏁 Code Grand Prix Backend is LIVE`);
     console.log(`🌐 Port: ${env.PORT}`);

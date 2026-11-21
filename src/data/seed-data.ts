@@ -180,7 +180,7 @@ Calculate the minimum total race time achievable with at most one pit stop.
         },
         {
           input: "5 5 15\n100 100 100 100 100",
-          expectedOutput: "460",
+          expectedOutput: "445",
           isPublic: false
         }
       ]

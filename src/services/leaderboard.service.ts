@@ -1,3 +1,5 @@
+import { RoundService } from "./round.service.js";
+import { prisma } from "../config/database.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — LEADERBOARD & PROGRESS SERVICE
 // ==============================================================================
@@ -18,13 +20,28 @@ function normalizeProblemId(id: string): string {
 }
 
 export class LeaderboardService {
-  static getVisibility() {
-    return { visible: isResultsVisible };
+  static async getVisibility() {
+    const contest = await ContestRepository.getContest(env.CONTEST_ID);
+    return { visible: (await RoundService.clock(contest.id)).resultsVisible };
   }
 
-  static setVisibility(visible: boolean) {
-    isResultsVisible = visible;
-    return { visible: isResultsVisible };
+  static async getContestVisibility() {
+    const contest = await ContestRepository.getContest(env.CONTEST_ID);
+    return { visible: contest.resultsVisible };
+  }
+
+  static async setVisibility(visible: boolean) {
+    try {
+      const contest = await prisma.contest.update({
+        where: { id: env.CONTEST_ID }, data: { resultsVisible: visible }
+      });
+      isResultsVisible = contest.resultsVisible;
+      return { visible: contest.resultsVisible };
+    } catch (error) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
+      isResultsVisible = visible;
+      return { visible: isResultsVisible };
+    }
   }
 
   /**
@@ -32,9 +49,10 @@ export class LeaderboardService {
    */
   static async getLeaderboard(userRole?: Role | string) {
     const contest = await ContestRepository.getContest(env.CONTEST_ID);
-    const problems = await ProblemRepository.findAllPublic();
-    const totalProblems = problems.length;
+    const problems = await ProblemRepository.findAllScoring();
+    const totalProblems = (await ProblemRepository.findAllPublic()).length;
 
+    const clock = await RoundService.clock(contest.id);
     const isPrivileged =
       userRole === Role.ADMIN ||
       userRole === Role.VOLUNTEER ||
@@ -42,11 +60,12 @@ export class LeaderboardService {
       userRole?.toString().toUpperCase() === "VOLUNTEER";
 
     // If candidate and results are withheld by organizer
-    if (!isResultsVisible && !isPrivileged) {
+    const visible = clock.resultsVisible;
+    if (!visible && !isPrivileged) {
       return {
         contestId: contest.id,
         contestTitle: contest.title,
-        status: contest.status,
+        status: clock.status,
         visible: false,
         simulation: false,
         updatedAt: new Date().toISOString(),
@@ -70,12 +89,12 @@ export class LeaderboardService {
       // C13: Deduct hint penalties per-solved-problem: awarded = max(0, points - problemHintDeductions).
       // Unsolved problems award 0 and their hint penalties do not deduct from other solved problems!
       for (const prob of problems) {
-        const isSolved = solvedSubmissions.some(
+        const solved = solvedSubmissions.filter(
           (s) =>
             normalizeProblemId(s.problemId) === normalizeProblemId(prob.id) ||
             normalizeProblemId(s.problemId) === normalizeProblemId(prob.slug)
         );
-        if (isSolved) {
+        if (solved.length) {
           problemsSolved += 1;
           const problemHintDeductions = userReceipts
             .filter(
@@ -85,7 +104,7 @@ export class LeaderboardService {
             )
             .reduce((sum, r) => sum + r.deductionApplied, 0);
 
-          const awarded = Math.max(0, prob.points - problemHintDeductions);
+          const awarded = Math.max(0, solved.reduce((best, submission) => Math.max(best, submission.score), 0) - problemHintDeductions);
           totalScore += awarded;
         }
       }
@@ -95,7 +114,7 @@ export class LeaderboardService {
         displayName: p.displayName,
         team: p.team || "CPC Grid",
         problemsSolved,
-        totalProblems,
+        totalProblems: Math.max(totalProblems, problemsSolved),
         totalScore,
         totalHintPenalties,
         status: session.status
@@ -117,8 +136,8 @@ export class LeaderboardService {
     return {
       contestId: contest.id,
       contestTitle: contest.title,
-      status: contest.status,
-      visible: isResultsVisible,
+      status: clock.status,
+      visible,
       simulation: false,
       updatedAt: new Date().toISOString(),
       rows: rankedRows
@@ -130,8 +149,8 @@ export class LeaderboardService {
    */
   static async getProgress(userId: string, driverId: string, contestId: string = env.CONTEST_ID) {
     const contest = await ContestRepository.getContest(contestId);
-    const problems = await ProblemRepository.findAllPublic();
-    const totalProblems = problems.length;
+    const problems = await ProblemRepository.findAllScoring();
+    const totalProblems = (await ProblemRepository.findAllPublic()).length;
 
     const solvedSubmissions = await SubmissionRepository.findAllSolvedByUser(userId);
     const allUserSubmissions = await SubmissionRepository.findAllByUser(userId);
@@ -141,12 +160,12 @@ export class LeaderboardService {
     const solvedProblemIds: string[] = [];
 
     for (const prob of problems) {
-      const isSolved = solvedSubmissions.some(
+      const solved = solvedSubmissions.filter(
         (s) =>
           normalizeProblemId(s.problemId) === normalizeProblemId(prob.id) ||
           normalizeProblemId(s.problemId) === normalizeProblemId(prob.slug)
       );
-      if (isSolved) {
+      if (solved.length) {
         solvedProblemIds.push(prob.slug);
         const problemHintDeductions = userReceipts
           .filter(
@@ -156,18 +175,19 @@ export class LeaderboardService {
           )
           .reduce((sum, r) => sum + r.deductionApplied, 0);
 
-        currentScore += Math.max(0, prob.points - problemHintDeductions);
+        currentScore += Math.max(0, solved.reduce((best, submission) => Math.max(best, submission.score), 0) - problemHintDeductions);
       }
     }
 
-    const attemptedProblemIds = Array.from(
-      new Set(allUserSubmissions.map((s) => s.problemId))
-    );
+    const attemptedProblemIds = Array.from(new Set(allUserSubmissions.map(s => {
+      const match = problems.find(p => p.id === s.problemId || p.slug === s.problemId);
+      return match?.slug || s.problemId;
+    })));
 
     return {
       contestId: contest.id,
       driverId,
-      totalProblems,
+      totalProblems: Math.max(totalProblems, solvedProblemIds.length),
       attemptedProblemIds,
       solvedProblemIds,
       currentScore,

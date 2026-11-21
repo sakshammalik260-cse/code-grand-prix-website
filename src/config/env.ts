@@ -8,6 +8,9 @@ import { z } from "zod";
 // Load .env file
 dotenv.config();
 
+const positiveInt = (fallback: number, min: number, max: number) =>
+  z.string().default(String(fallback)).transform(Number).pipe(z.number().int().min(min).max(max));
+
 const envSchema = z
   .object({
     PORT: z.string().default("4000").transform((val) => parseInt(val, 10)),
@@ -41,15 +44,22 @@ const envSchema = z
     JUDGE_PROVIDER: z.enum(["local", "judge0"]).default("local"),
     JUDGE0_API_URL: z.string().default("http://localhost:2358"),
     JUDGE0_API_KEY: z.string().default(""),
-    JUDGE0_WAIT_FOR_RESULT: z
-      .string()
-      .default("true")
-      .transform((val) => val === "true"),
-    MAX_SOURCE_CODE_BYTES: z.string().default("65536").transform(Number),
-    MAX_CUSTOM_INPUT_BYTES: z.string().default("65536").transform(Number),
+    ALLOW_TRUSTED_LOCAL_JUDGE: z.enum(["true", "false"]).default("false").transform(value => value === "true"),
+    JUDGE0_LANGUAGE_PYTHON: z.string().default("Python (3.8.1)"),
+    JUDGE0_LANGUAGE_JAVA: z.string().default("Java (OpenJDK 13.0.1)"),
+    JUDGE0_LANGUAGE_CPP: z.string().default("C++ (GCC 9.2.0)"),
+    JUDGE0_LANGUAGE_JAVASCRIPT: z.string().default("JavaScript (Node.js 12.14.0)"),
+    JUDGE0_HTTP_TIMEOUT_MS: positiveInt(4000, 100, 15000),
+    JUDGE0_JOB_TIMEOUT_MS: positiveInt(150000, 500, 300000),
+    JUDGE0_POLL_INTERVAL_MS: positiveInt(250, 50, 3000),
+    JUDGE_REQUEST_TIMEOUT_MS: positiveInt(180000, 500, 600000),
+    JUDGE_MAX_CONCURRENT_REQUESTS: positiveInt(4, 1, 32),
+    JUDGE_MAX_CASES: positiveInt(100, 1, 200),
+    MAX_SOURCE_CODE_BYTES: positiveInt(65536, 1, 262144),
+    MAX_CUSTOM_INPUT_BYTES: positiveInt(65536, 1, 262144),
     DEFAULT_TIME_LIMIT_MS: z.string().default("2000").transform(Number),
     DEFAULT_MEMORY_LIMIT_MB: z.string().default("256").transform(Number),
-    MAX_OUTPUT_BYTES: z.string().default("65536").transform(Number),
+    MAX_OUTPUT_BYTES: positiveInt(65536, 1024, 262144),
     POINTS_EASY: z.string().default("100").transform(Number),
     POINTS_MEDIUM: z.string().default("250").transform(Number),
     POINTS_HARD: z.string().default("500").transform(Number),
@@ -78,3 +88,15 @@ const envSchema = z
   );
 
 export const env = envSchema.parse(process.env);
+
+if (env.NODE_ENV === "production") {
+  if (env.ALLOW_DEV_FALLBACK) {
+    throw new Error("Production requires ALLOW_DEV_FALLBACK=false; refusing in-memory competition state.");
+  }
+  if (env.JWT_SECRET.length < 32 || env.JWT_SECRET.includes("replace-in-prod")) {
+    throw new Error("Production requires a unique, high-entropy JWT_SECRET of at least 32 characters.");
+  }
+  if (!env.COOKIE_SECURE) {
+    throw new Error("Production requires COOKIE_SECURE=true behind HTTPS.");
+  }
+}

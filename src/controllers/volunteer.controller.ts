@@ -8,14 +8,18 @@ import { VolunteerService } from "../services/volunteer.service.js";
 
 export const resolveIncidentSchema = z.object({
   action: z.string().min(1, "action is required"),
-  reason: z.string().min(1, "reason is required")
+  reason: z.string().min(1, "reason is required"),
+  expectedSessionRevision: z.number().int().positive().optional()
 });
 
 export const authorizeResumeSchema = z.object({
-  decision: z.string().default("AUTHORIZE_RESUME"),
-  expectedSessionRevision: z.number().optional(),
+  contestId: z.string().min(1).optional(),
+  driverId: z.string().min(1).optional(),
+  expectedIncidentIds: z.array(z.string().min(1)).optional(),
+  decision: z.enum(["AUTHORIZE_RESUME", "APPROVE_RESUME"]),
+  expectedSessionRevision: z.number().int().positive(),
   note: z.string().min(1, "note is required"),
-  idempotencyKey: z.string().optional()
+  idempotencyKey: z.string().trim().min(1)
 });
 
 export class VolunteerController {
@@ -51,7 +55,7 @@ export class VolunteerController {
     try {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const { action, reason } = req.body;
-      const result = await VolunteerService.resolveIncident(id, action, reason, req.user!.id);
+      const result = await VolunteerService.resolveIncident(id, action, reason, req.user!.id, req.body.expectedSessionRevision);
       res.status(200).json(result);
     } catch (error) {
       next(error);

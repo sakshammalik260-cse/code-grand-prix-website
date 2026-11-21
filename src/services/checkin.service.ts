@@ -1,10 +1,11 @@
+import { prisma } from "../config/database.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — CHECK-IN & SESSION SERVICE
 // ==============================================================================
 
 import { CheckinStatus, RaceSessionStatus } from "@prisma/client";
 import { env } from "../config/env.js";
-import { ContestRepository } from "../repositories/contest.repository.js";
+import { RoundService } from "./round.service.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { IncidentRepository } from "../repositories/incident.repository.js";
 import { UserRepository } from "../repositories/user.repository.js";
@@ -52,8 +53,7 @@ export class CheckinService {
       reasons.push("Fullscreen arena mode is required to enter the competition.");
     }
 
-    const contest = await ContestRepository.getContest(contestId);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
+    const timeDetails = await RoundService.clock(contestId);
 
     const isReady = reasons.length === 0;
     const checkinStatus: CheckinStatus = isReady ? CheckinStatus.READY : CheckinStatus.BLOCKED;
@@ -113,14 +113,38 @@ export class CheckinService {
    * Get authoritative session status matching Frontend SessionEnvelope (Page 9 & 14)
    */
   static async getSession(userId: string, contestId: string = env.CONTEST_ID) {
-    const contest = await ContestRepository.getContest(contestId);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
-    const session = await SessionRepository.findOrCreate(userId, contestId);
+    const timeDetails = await RoundService.clock(contestId);
+    let session = await SessionRepository.findOrCreate(userId, contestId);
+    if (timeDetails.status === "LIVE" && session.status === "WAITING" && session.checkinStatus === "READY") {
+      await prisma.session.updateMany({
+        where: { id: session.id, status: "WAITING", checkinStatus: "READY" },
+        data: { status: "ACTIVE", revision: { increment: 1 } }
+      });
+      session = await SessionRepository.findOrCreate(userId, contestId);
+    }
     const user = await UserRepository.findById(userId);
 
     const incidents = await IncidentRepository.findBySessionId(session.id);
     const latestIncident = incidents[0] || null;
+    let lastAuthorization: { id: string; volunteerId: string; incidentId: string | null; createdAt: Date; volunteer: { role: string } } | null = null;
+    if (session.status === RaceSessionStatus.ACTIVE || session.status === RaceSessionStatus.RESUME_AUTHORIZED) {
+      try {
+        lastAuthorization = await prisma.auditLog.findFirst({
+          where: { sessionId: session.id, action: "AUTHORIZE_RESUME" },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, volunteerId: true, incidentId: true, createdAt: true,
+            volunteer: { select: { role: true } } }
+        });
+      } catch (error) {
+        if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
+      }
+    }
 
+    const coverage = lastAuthorization ? await prisma.incident.findMany({
+      where: { sessionId: session.id, blocking: true, resolvedAt: lastAuthorization.createdAt,
+        resolvedBy: lastAuthorization.volunteerId, resolutionAction: "AUTHORIZE_RESUME" },
+      select: { id: true }, orderBy: { id: "asc" }
+    }) : [];
     const driverId = user?.driverId || userId;
     const role = user?.role === "ADMIN" ? "ADMIN" : user?.role === "VOLUNTEER" ? "VOLUNTEER" : "CANDIDATE";
 
@@ -133,7 +157,7 @@ export class CheckinService {
       },
       session: {
         id: session.id,
-        contestId: contest.id,
+        contestId: timeDetails.id,
         driverId,
         status: session.status,
         revision: session.revision,
@@ -144,15 +168,28 @@ export class CheckinService {
           ? {
               id: latestIncident.id,
               clientEventId: latestIncident.eventId,
+              contestId: timeDetails.id,
+              driverId,
               sessionId: session.id,
               type: latestIncident.type,
+              observedAt: latestIncident.occurredAt.toISOString(),
+              problemId: latestIncident.problemId,
               reviewStatus: latestIncident.status,
               blocking: latestIncident.blocking,
               timestamp: latestIncident.receivedAt.toISOString(),
               simulation: false
             }
           : null,
-        resumeAuthorization: null,
+        resumeAuthorization: lastAuthorization ? {
+          id: lastAuthorization.id,
+          incidentId: lastAuthorization.incidentId || "session_bulk",
+          ...(coverage.length && lastAuthorization.incidentId ? { sessionId: session.id, coveredIncidentIds: coverage.map(item => item.id) } : {}),
+          decision: "AUTHORIZE_RESUME",
+          actorId: lastAuthorization.volunteerId,
+          actorRole: lastAuthorization.volunteer.role === "ADMIN" ? "ADMIN" : "VOLUNTEER",
+          decidedAt: lastAuthorization.createdAt.toISOString(),
+          simulation: false
+        } : null,
         volunteerNotified: false,
         simulation: false
       },
@@ -162,6 +199,9 @@ export class CheckinService {
       sessionStatus: session.status,
       checkinStatus: session.checkinStatus,
       lockReason: session.lockReason,
+      lastSeenAt: session.lastSeenAt.toISOString(),
+      cameraStatus: session.cameraStatus,
+      lockCount: session.lockCount,
       lockedAt: session.lockedAt ? session.lockedAt.toISOString() : null,
       timeRemainingMs: timeDetails.remainingMs
     };

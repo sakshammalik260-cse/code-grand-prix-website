@@ -1,3 +1,5 @@
+import { prisma } from "../config/database.js";
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — RACE ASSIST HINT SERVICE
 // ==============================================================================
@@ -19,20 +21,24 @@ export class HintService {
       throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Problem '${problemId}' not found.`);
     }
 
+    // Candidate IDs are slugs; Prisma relations require the internal problem UUID.
+    let canonicalProblemId = problem.slug;
+    let configurationRevision = 1;
+    try {
+      const row = await prisma.problem.findUnique({ where: { slug: problem.slug },
+        select: { id: true, revision: true } });
+      if (row) { canonicalProblemId = row.id; configurationRevision = row.revision; }
+    } catch (error) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
+    }
     const { hints, totalHintPenalty } = await HintRepository.getProblemHints(
-      problem.slug,
-      userId,
-      contestId
+      canonicalProblemId, userId, contestId
     );
-
-    const remainingPotentialScore = Math.max(0, problem.points - totalHintPenalty);
-
     return {
-      problemId: problem.slug,
-      maximumPoints: problem.points,
-      totalHintPenalty,
-      remainingPotentialScore,
-      hints
+      contestId, problemId: problem.slug, configurationRevision,
+      maximumPoints: problem.points, totalHintPenalty,
+      remainingPotentialScore: Math.max(0, problem.points - totalHintPenalty),
+      hints: hints.map(h => ({ ...h, problemId: problem.slug }))
     };
   }
 
@@ -59,6 +65,9 @@ export class HintService {
       );
     }
 
+    if (session.status !== RaceSessionStatus.ACTIVE && session.status !== RaceSessionStatus.RESUME_AUTHORIZED) {
+      throw new AppError(403, ERROR_CODES.SESSION_LOCKED, "Competition session is not active.");
+    }
     const problem = await ProblemRepository.findByIdPublic(problemId);
     if (!problem) {
       throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Problem '${problemId}' not found.`);
@@ -69,8 +78,25 @@ export class HintService {
       throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Hint '${hintId}' not found.`);
     }
 
-    // C14: Verify hint belongs to the requested problem
-    if (hint.problemId !== problem.id && hint.problemId !== problem.slug) {
+    let canonicalProblemId = problem.slug;
+    let configurationRevision = 1;
+    try {
+      const row = await prisma.problem.findUnique({ where: { slug: problem.slug },
+        select: { id: true, revision: true } });
+      if (row) { canonicalProblemId = row.id; configurationRevision = row.revision; }
+    } catch (error) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
+    }
+    // Validate the configuration used for the candidate's confirmation.
+    const pending = input as typeof input & { configurationRevision?: number; expectedDeductionPoints?: number };
+    if (pending.configurationRevision !== undefined && pending.configurationRevision !== configurationRevision) {
+      throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Hint configuration changed. Refresh before unlocking.");
+    }
+    if (pending.expectedDeductionPoints !== undefined && pending.expectedDeductionPoints !== hint.deductionPoints) {
+      throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Hint price changed. Refresh before unlocking.");
+    }
+    // C14: Verify hint belongs to this problem's canonical ID.
+    if (hint.problemId !== canonicalProblemId) {
       throw new AppError(
         400,
         ERROR_CODES.VALIDATION_ERROR,
@@ -81,14 +107,15 @@ export class HintService {
     const result = await HintRepository.unlockHint(
       userId,
       contestId,
-      problem.slug,
+      canonicalProblemId,
       hintId,
-      input.operationId
+      input.operationId,
+      configurationRevision
     );
 
     // Fetch updated hints state for complete frontend DTO (Page 14)
     const { hints: updatedHints, totalHintPenalty } = await HintRepository.getProblemHints(
-      problem.slug,
+      canonicalProblemId,
       userId,
       contestId
     );
@@ -98,13 +125,14 @@ export class HintService {
     return {
       contestId,
       problemId: problem.slug,
-      configurationRevision: session.revision,
+      configurationRevision,
       maximumPoints: problem.points,
       totalHintPenalty,
       remainingPotentialScore,
-      hints: updatedHints,
+      hints: updatedHints.map(h => ({ ...h, problemId: problem.slug })),
       hint: {
         id: result.hint.id,
+        problemId: problem.slug,
         order: result.hint.order,
         deductionPoints: result.hint.deductionPoints,
         content: result.hint.content,

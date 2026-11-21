@@ -1,3 +1,5 @@
+import { CheckinService } from "./checkin.service.js";
+import { UserRepository } from "../repositories/user.repository.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — VIOLATION & INCIDENT SERVICE
 // ==============================================================================
@@ -5,7 +7,6 @@
 import { env } from "../config/env.js";
 import { IncidentRepository } from "../repositories/incident.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
-import { ContestRepository } from "../repositories/contest.repository.js";
 import { IncidentAction, IncidentType, RaceSessionStatus } from "@prisma/client";
 
 export interface ReportViolationInput {
@@ -42,6 +43,12 @@ export class ViolationService {
     // 1. Deduplication Check
     const existing = await IncidentRepository.findByEventId(eventId);
     const session = await SessionRepository.findOrCreate(userId, contestId);
+    const user = await UserRepository.findById(userId);
+    if (!user) throw new Error("Authenticated participant not found.");
+    const trustedDriverId = user.driverId;
+    if (existing && (existing.userId !== userId || existing.sessionId !== session.id)) {
+      throw new Error("Incident idempotency key belongs to a different candidate session.");
+    }
 
     if (existing) {
       return {
@@ -49,7 +56,11 @@ export class ViolationService {
         incident: {
           id: existing.id,
           clientEventId: existing.eventId,
+          contestId,
+          driverId: trustedDriverId,
           sessionId: existing.sessionId,
+          observedAt: existing.occurredAt.toISOString(),
+          problemId: existing.problemId,
           type: existing.type,
           reviewStatus: existing.status,
           status: existing.status,
@@ -57,13 +68,7 @@ export class ViolationService {
           timestamp: existing.receivedAt.toISOString(),
           simulation: false
         },
-        session: {
-          id: session.id,
-          driverId: input.driverId,
-          status: session.status,
-          revision: session.revision,
-          policy: SessionRepository.getPolicy(session.status)
-        },
+        session: (await CheckinService.getSession(userId, contestId)).session,
         accepted: true,
         action: existing.action,
         sessionStatus: session.status,
@@ -78,7 +83,7 @@ export class ViolationService {
       type === IncidentType.CAMERA_INTERRUPTED ||
       type === IncidentType.CAMERA_TRACK_ENDED;
 
-    const action = isCritical ? IncidentAction.LOCK : IncidentAction.LOG_ONLY;
+    let action = isCritical ? IncidentAction.LOCK : IncidentAction.LOG_ONLY;
 
     let updatedSession = session;
 
@@ -88,6 +93,8 @@ export class ViolationService {
       session.status === RaceSessionStatus.LOCK_PENDING ||
       session.status === RaceSessionStatus.UNDER_REVIEW;
 
+    // Subsequent observations in one lock episode remain audit events, not new blockers.
+    if (alreadyLocked && isCritical) action = IncidentAction.LOG_ONLY;
     if (action === IncidentAction.LOCK && !alreadyLocked) {
       // First critical event in this episode -> locks session and increments lockCount
       updatedSession = await SessionRepository.lockSession(
@@ -105,20 +112,21 @@ export class ViolationService {
       problemId: input.problemId || null,
       type,
       action,
-      blocking: isCritical,
+      blocking: action === IncidentAction.LOCK,
       occurredAt,
       details: typeof input.details === "object" ? JSON.stringify(input.details) : input.details?.toString()
     });
-
-    const contest = await ContestRepository.getContest(contestId);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
 
     return {
       incidentId: incident.id,
       incident: {
         id: incident.id,
         clientEventId: incident.eventId,
+        contestId,
+        driverId: trustedDriverId,
         sessionId: incident.sessionId,
+        observedAt: incident.occurredAt.toISOString(),
+        problemId: incident.problemId,
         type: incident.type,
         reviewStatus: incident.status,
         status: incident.status,
@@ -126,15 +134,7 @@ export class ViolationService {
         timestamp: incident.receivedAt.toISOString(),
         simulation: false
       },
-      session: {
-        id: updatedSession.id,
-        driverId: input.driverId,
-        status: updatedSession.status,
-        revision: updatedSession.revision,
-        policy: SessionRepository.getPolicy(updatedSession.status),
-        updatedAt: updatedSession.updatedAt.toISOString(),
-        serverTime: timeDetails.serverTime
-      },
+      session: (await CheckinService.getSession(userId, contestId)).session,
       accepted: true,
       action,
       sessionStatus: updatedSession.status
