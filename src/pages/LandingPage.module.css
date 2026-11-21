@@ -60,6 +60,69 @@
   content: '';
 }
 
+.heroGrid {
+  position: absolute;
+  z-index: -2;
+  inset: -18% -10% 24%;
+  opacity: .48;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 5%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
+  background-size: clamp(3rem, 5vw, 5.25rem) clamp(3rem, 5vw, 5.25rem);
+  mask-image: linear-gradient(180deg, #000, transparent 92%);
+  transform: perspective(38rem) rotateX(63deg) scale(1.08);
+  transform-origin: top center;
+  pointer-events: none;
+}
+
+.ambientGlow {
+  position: absolute;
+  z-index: -2;
+  top: 7%;
+  left: 37%;
+  width: min(48rem, 58vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: .68;
+  background: radial-gradient(circle, rgb(52 203 224 / 11%), rgb(111 70 255 / 6%) 32%, transparent 69%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.heroParticles {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.heroParticles i {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #dffbff;
+  box-shadow: 0 0 .7rem rgb(92 224 237 / 72%);
+  opacity: .26;
+  animation: particle-drift 7s ease-in-out infinite alternate;
+}
+
+.heroParticles i:nth-child(1) { top: 17%; left: 8%; }
+.heroParticles i:nth-child(2) { top: 28%; left: 18%; animation-delay: -2.1s; }
+.heroParticles i:nth-child(3) { top: 13%; left: 31%; animation-delay: -4.3s; }
+.heroParticles i:nth-child(4) { top: 38%; left: 43%; animation-delay: -1.2s; }
+.heroParticles i:nth-child(5) { top: 18%; left: 55%; animation-delay: -5.1s; }
+.heroParticles i:nth-child(6) { top: 31%; left: 66%; animation-delay: -3.4s; }
+.heroParticles i:nth-child(7) { top: 14%; left: 78%; animation-delay: -1.8s; }
+.heroParticles i:nth-child(8) { top: 45%; left: 88%; animation-delay: -4.8s; }
+.heroParticles i:nth-child(9) { top: 57%; left: 13%; animation-delay: -3.1s; }
+.heroParticles i:nth-child(10) { top: 68%; left: 35%; animation-delay: -5.8s; }
+.heroParticles i:nth-child(11) { top: 54%; left: 58%; animation-delay: -2.7s; }
+.heroParticles i:nth-child(12) { top: 71%; left: 72%; animation-delay: -.9s; }
+.heroParticles i:nth-child(13) { top: 63%; left: 91%; animation-delay: -4.1s; }
+.heroParticles i:nth-child(14) { top: 82%; left: 48%; animation-delay: -6.2s; }
+
 .grandstandLights {
   position: absolute;
   z-index: -2;
@@ -154,20 +217,31 @@
 .trackEnergy span:nth-child(3) { top: 75%; right: -2%; width: 53%; opacity: .3; }
 
 .heroFlag {
-  --flag-opacity: .72;
   position: absolute;
   z-index: -1;
-  top: 6.8rem;
-  right: -2.5rem;
-  width: min(24vw, 22rem);
-  aspect-ratio: 1.75;
-  opacity: var(--flag-opacity);
-  transform: rotate(-7deg) skewX(-7deg);
-  transform-origin: top right;
-  background: conic-gradient(from 90deg, rgb(238 241 245 / 88%) 25%, #0f1218 0 50%, rgb(238 241 245 / 88%) 0 75%, #0f1218 0) 0 0 / 3.75rem 3.75rem;
-  clip-path: polygon(5% 5%, 100% 0, 92% 88%, 58% 76%, 30% 94%, 0 75%);
-  filter: drop-shadow(0 16px 24px rgb(0 0 0 / 28%));
-  animation: flag-in .7s .18s var(--cgp-ease-enter) both;
+  top: clamp(4.2rem, 8vh, 6.8rem);
+  right: clamp(-3.2rem, -2vw, -1rem);
+  width: min(29vw, 24rem);
+  height: auto;
+  aspect-ratio: 440 / 250;
+  opacity: .75;
+  transform: rotate(-9deg);
+  transform-origin: 75% 20%;
+  filter: drop-shadow(0 20px 32px rgb(0 0 0 / 65%));
+  pointer-events: none;
+  animation: flag-in .7s .18s var(--cgp-ease-enter) both, hero-flag-flutter 8s ease-in-out infinite alternate;
+}
+
+@keyframes hero-flag-flutter {
+  0% {
+    transform: rotate(-9deg) skewX(-3deg) scale(1);
+  }
+  50% {
+    transform: rotate(-10.5deg) skewX(-1deg) scale(1.02) translateY(-4px);
+  }
+  100% {
+    transform: rotate(-7.5deg) skewX(-5deg) scale(0.99) translateY(3px);
+  }
 }
 
 .heroFrame,
@@ -295,7 +369,16 @@
 }
 
 .hero[data-motion-active='true'] .heroIdentity,
-.hero[data-motion-active='true'] .eventControl { will-change: transform, opacity; }
+.hero[data-motion-active='true'] .eventControl,
+.hero[data-motion-active='true'] .heroArtwork,
+.hero[data-motion-active='true'] .heroGrid,
+.hero[data-motion-active='true'] .heroFlag { will-change: transform, opacity; }
+
+.hero[data-gsap-scene='true'] .heroArtwork,
+.hero[data-gsap-scene='true'] .heroFlag,
+.hero[data-gsap-scene='true'] .heroIdentity > *,
+.hero[data-gsap-scene='true'] .eventControl > *,
+.hero[data-gsap-scene='true'] .heroTelemetry > div { animation: none; }
 
 .eventControl::before {
   position: absolute;
@@ -402,7 +485,7 @@
 .primaryAction,
 .startingLine > a {
   border-color: #ff4b53;
-  background: var(--cgp-red);
+  background: var(--cgp-control-red);
   color: white;
   box-shadow: 0 10px 30px rgb(242 13 24 / 20%);
 }
@@ -477,9 +560,18 @@
   text-transform: uppercase;
 }
 
+.scrollStory {
+  position: relative;
+  overflow: clip;
+  background: var(--cgp-carbon);
+}
+
 .eventRail {
+  position: relative;
+  z-index: 5;
   border-block: 1px solid var(--cgp-border);
-  background: var(--cgp-surface-1);
+  background: linear-gradient(90deg, rgb(16 18 23 / 98%), rgb(21 25 32 / 98%) 52%, rgb(13 15 20 / 98%));
+  box-shadow: 0 22px 55px rgb(0 0 0 / 28%);
 }
 
 .eventRail .sectionFrame {
@@ -536,12 +628,54 @@
   background: var(--cgp-carbon);
 }
 
+.weekend > .sectionFrame,
+.driverRoute > .sectionFrame,
+.rules > .sectionFrame,
+.finalGrid > .sectionFrame {
+  position: relative;
+  z-index: 2;
+}
+
+.sectionWatermark {
+  position: absolute;
+  z-index: 0;
+  top: 8%;
+  right: -2vw;
+  color: transparent;
+  font: 700 clamp(8rem, 19vw, 22rem)/.8 var(--cgp-font-display);
+  letter-spacing: -.07em;
+  white-space: nowrap;
+  -webkit-text-stroke: 1px rgb(255 255 255 / 4%);
+  pointer-events: none;
+  user-select: none;
+}
+
 .weekend {
   border-bottom: 1px solid var(--cgp-border);
   background:
     linear-gradient(115deg, transparent 0 74%, rgb(242 13 24 / 4%) 74% 83%, transparent 83%),
     var(--cgp-carbon);
 }
+
+.weekend::after,
+.driverRoute::after,
+.rules::after,
+.finalGrid::after {
+  position: absolute;
+  z-index: 0;
+  width: clamp(18rem, 38vw, 42rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  content: '';
+  opacity: .42;
+  filter: blur(32px);
+  pointer-events: none;
+}
+
+.weekend::after { top: 3%; left: -19%; background: radial-gradient(circle, rgb(242 13 24 / 13%), transparent 68%); }
+.driverRoute::after { right: -18%; bottom: -28%; background: radial-gradient(circle, rgb(49 190 218 / 10%), transparent 68%); }
+.rules::after { top: 8%; left: -20%; background: radial-gradient(circle, rgb(105 70 255 / 10%), transparent 68%); }
+.finalGrid::after { right: -12%; bottom: -45%; background: radial-gradient(circle, rgb(242 13 24 / 14%), transparent 68%); }
 
 .sectionHeading {
   margin-bottom: 3rem;
@@ -574,6 +708,21 @@
   gap: 1rem;
 }
 
+.stageTrack { position: relative; min-width: 0; }
+
+.stageProgress {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cgp-red), #ff646b 62%, #64ddeb);
+  box-shadow: 0 0 18px rgb(242 13 24 / 35%);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
 .briefing {
   padding: 2rem;
   border: 1px solid var(--cgp-border-strong);
@@ -595,6 +744,8 @@
 .briefing > p svg { margin-top: .2rem; flex: 0 0 auto; color: var(--cgp-red-soft); }
 
 .stageList {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border: 1px solid var(--cgp-border);
@@ -632,12 +783,16 @@
   align-items: center;
 }
 
+.routeIntro,
+.rulesIntro { align-self: start; }
+
 .routeIntro > p { max-width: 32rem; margin-top: 1.5rem; color: var(--cgp-silver); font-size: .875rem; line-height: 1.75; }
 .routeIntro > a { margin-top: 1.75rem; display: inline-flex; align-items: center; gap: .8rem; color: var(--cgp-white); font: 700 .6875rem/1 var(--cgp-font-body); letter-spacing: .08em; }
 .routeIntro > a svg { color: var(--cgp-red-soft); transition: transform var(--cgp-duration-base) var(--cgp-ease-standard); }
 .routeIntro > a:hover svg { transform: translateX(.25rem); }
 
-.routeList { display: grid; }
+.routeList { position: relative; display: grid; }
+.routeList::before { position: absolute; top: 2.4rem; bottom: 2.4rem; left: 3rem; width: 1px; background: linear-gradient(transparent, rgb(242 13 24 / 48%) 16% 84%, transparent); content: ''; }
 .routeList li { min-width: 0; padding: 1.65rem 0; display: grid; grid-template-columns: 2rem 2rem minmax(0, 1fr); align-items: center; gap: 1rem; border-bottom: 1px solid var(--cgp-border); transition: background-color var(--cgp-duration-base) var(--cgp-ease-standard), transform var(--cgp-duration-base) var(--cgp-ease-standard); }
 .routeList li:hover { background: linear-gradient(90deg, rgb(242 13 24 / 4%), transparent); transform: translateX(.3rem); }
 .routeList li:last-child { border-bottom: 0; }
@@ -651,7 +806,7 @@
 .rulesIntro > p { margin: 1.4rem 0; color: var(--cgp-silver); font-size: .875rem; }
 .rulesIntro :global(.status-indicator) { margin-top: .25rem; }
 .rulesIntro > small { display: block; max-width: 20rem; margin-top: 1rem; color: var(--cgp-muted); font-size: .6875rem; line-height: 1.55; }
-.rulesList { border-top: 1px solid var(--cgp-border); }
+.rulesList { position: relative; border-top: 1px solid var(--cgp-border); }
 .rulesList li { padding: 1.45rem 0; display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: 1rem; border-bottom: 1px solid var(--cgp-border); transition: background-color var(--cgp-duration-base) var(--cgp-ease-standard), transform var(--cgp-duration-base) var(--cgp-ease-standard); }
 .rulesList li:hover { background: linear-gradient(90deg, rgb(255 189 74 / 3.5%), transparent); transform: translateX(.3rem); }
 .rulesList > li > span { color: var(--cgp-red-soft); font: 650 .6875rem/1.6 var(--cgp-font-technical); }
@@ -699,6 +854,19 @@
 .startingLine h2 { margin-top: .45rem; color: var(--cgp-white); font: 700 clamp(1.25rem, 2vw, 1.75rem)/1.2 var(--cgp-font-display); }
 .startingLine p { margin-top: .45rem; display: flex; align-items: center; gap: .4rem; color: var(--cgp-muted); font-size: .6875rem; }
 
+@media (min-width: 62.51rem) {
+  .routeIntro,
+  .rulesIntro { position: sticky; top: 8rem; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .briefing:hover,
+  .stageList li:hover,
+  .routeList li:hover,
+  .rulesList li:hover,
+  .classification:hover { transform: none; }
+}
+
 @keyframes hero-settle {
   from { opacity: .7; }
   to { opacity: 1; }
@@ -729,10 +897,15 @@
   to { opacity: .86; transform: scale(1); }
 }
 
+@keyframes particle-drift {
+  from { translate: -4px -8px; opacity: .12; }
+  to { translate: 7px 12px; opacity: .48; }
+}
+
 @media (max-width: 62.5rem) {
   .heroFrame { grid-template-columns: minmax(0, 1.15fr) minmax(19rem, .85fr); gap: 2rem; }
   .wordmark { font-size: clamp(3.6rem, 8vw, 5.5rem); }
-  .heroFlag { --flag-opacity: .5; width: 19rem; opacity: var(--flag-opacity); }
+  .heroFlag { width: 17rem; opacity: .55; }
   .heroTelemetry { grid-template-columns: .7fr 1.35fr .55fr .9fr; }
   .eventRail .sectionFrame { grid-template-columns: 1fr .8fr; }
   .railCountdown { grid-column: 1 / -1; padding-left: 0; border-top: 1px solid var(--cgp-border); }
@@ -752,7 +925,10 @@
   .heroArtwork { object-position: 39% bottom; }
   .heroShade { background: linear-gradient(180deg, rgb(3 4 6 / 72%) 0 43%, rgb(3 4 6 / 22%) 63%, rgb(3 4 6 / 84%) 100%); }
   .heroShade::after { display: none; }
-  .heroFlag { --flag-opacity: .44; top: 4.75rem; right: -3.5rem; width: 10rem; opacity: var(--flag-opacity); background-size: 2rem 2rem; }
+  .heroGrid { inset: -8% -40% 42%; opacity: .28; background-size: 3rem 3rem; }
+  .ambientGlow { top: 10%; left: 8%; width: 84vw; opacity: .42; }
+  .grandstandLights, .heroParticles, .velocityField, .trackEnergy { display: none; }
+  .heroFlag { top: 4.75rem; right: -2.5rem; width: 11rem; opacity: .42; }
   .heroFrame, .sectionFrame { width: calc(100% - 2.5rem); }
   .heroFrame { min-height: 0; padding: 7.8rem 0 6.25rem; display: flex; flex-direction: column; align-items: stretch; gap: 2.35rem; }
   .heroIdentity { align-self: center; width: 100%; margin: 0; }
@@ -792,12 +968,15 @@
   .telemetryLabel { font-size: .5625rem; letter-spacing: .13em; }
   .briefing { display: block; padding: 1.4rem; }
   .briefing dl { margin-top: 1.35rem; }
+  .stageTrack { padding-left: .25rem; }
+  .stageProgress { top: 1rem; bottom: 1rem; left: 3.15rem; width: 2px; height: auto; background: linear-gradient(180deg, var(--cgp-red), #ff646b 62%, #64ddeb); transform: scaleY(0); transform-origin: top; }
   .stageList { grid-template-columns: 1fr; }
   .stageList li { min-height: 0; padding: 1.45rem; display: grid; grid-template-columns: 1.5rem 2.5rem minmax(0, 1fr); align-items: start; gap: .8rem; border-right: 0; border-bottom: 1px solid var(--cgp-border); }
   .stageList li:last-child { border-bottom: 0; }
   .stageIcon { width: 2.35rem; height: 2.35rem; margin: 0; }
   .stageList h3 { margin-top: .45rem; }
   .driverRoute .sectionFrame, .rules .sectionFrame { grid-template-columns: 1fr; gap: 2.5rem; }
+  .routeList::before { left: 2.55rem; }
   .routeList li { grid-template-columns: 1.7rem 1.8rem minmax(0, 1fr); }
   .classification { grid-template-columns: 1fr; gap: 1.4rem; padding: 1.7rem 1.35rem; }
   .trophy { width: 3.25rem; height: 3.25rem; border-right: 0; border-bottom: 1px solid var(--cgp-border); }
@@ -806,6 +985,7 @@
   .startingLine { grid-template-columns: 2.7rem 1fr; gap: 1rem; padding: 1.35rem; }
   .checks { width: 2.5rem; height: 2.5rem; background-size: 1.1rem 1.1rem; }
   .startingLine > a { grid-column: 1 / -1; width: 100%; }
+  .sectionWatermark { top: 4%; right: -18%; font-size: 8rem; opacity: .7; }
 }
 
 @media (max-width: 30rem) {
@@ -822,7 +1002,8 @@
 @media (prefers-reduced-motion: reduce) {
   .heroArtwork, .heroFlag, .heroIdentity, .heroIdentity > *, .eventControl, .eventControl > *, .heroTelemetry > div, .grandstandLights i { animation: none; }
   .heroArtwork, .heroIdentity, .eventControl { will-change: auto; }
-  .velocityField, .trackEnergy { display: none; }
+  .velocityField, .trackEnergy, .heroParticles { display: none; }
+  .heroGrid { transform: perspective(38rem) rotateX(63deg) scale(1.08); }
   .sessionTag i, .accessNote svg, .primaryAction, .secondaryAction, .classification, .classification > a, .startingLine, .startingLine > a, .routeIntro > a svg, .railDate, .railStatus, .railCountdown, .briefing, .stageList li, .routeList li, .rulesList li { transition: none; }
   .classification:hover, .startingLine:hover, .railDate:hover, .railStatus:hover, .railCountdown:hover, .briefing:hover, .stageList li:hover, .routeList li:hover, .rulesList li:hover { transform: none; }
   .eventControl:hover .accessNote svg { transform: none; }

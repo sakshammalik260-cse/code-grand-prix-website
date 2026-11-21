@@ -9,6 +9,19 @@
   color: var(--cgp-white);
 }
 
+.watermark {
+  position: absolute;
+  z-index: 0;
+  top: 8%;
+  right: -3vw;
+  color: transparent;
+  font: 700 clamp(10rem, 27vw, 31rem)/.72 var(--cgp-font-display);
+  letter-spacing: -.09em;
+  -webkit-text-stroke: 1px rgb(255 255 255 / 4.5%);
+  pointer-events: none;
+  user-select: none;
+}
+
 .section::before {
   position: absolute;
   top: 0;
@@ -23,6 +36,8 @@
 .section:hover::before { background: linear-gradient(90deg, var(--cgp-red) 0 44%, transparent 44% 52%, var(--cgp-green) 52%); }
 
 .frame {
+  position: relative;
+  z-index: 1;
   width: min(var(--cgp-content-wide), calc(100% - max(2.5rem, 7vw)));
   margin-inline: auto;
 }
@@ -82,7 +97,6 @@
 .identity:hover {
   border-color: #47655b;
   background: linear-gradient(145deg, rgb(54 217 160 / 5%), var(--cgp-surface-1) 68%);
-  transform: translateY(-3px);
 }
 
 .identity::before {
@@ -172,7 +186,6 @@
 .philosophy:hover {
   border-color: var(--cgp-green);
   background: linear-gradient(100deg, rgb(54 217 160 / 7%), var(--cgp-surface-1));
-  transform: translateX(.2rem);
 }
 
 .philosophy > span {
@@ -214,8 +227,13 @@
 
 .pillar:hover {
   border-color: #47655b;
-  transform: translateY(-3px);
 }
+
+.identity,
+.pillar { transform-style: preserve-3d; }
+
+.pillar > *,
+.identity > * { transform: translateZ(16px); }
 
 .pillarTop {
   margin-bottom: 1.6rem;
@@ -241,6 +259,7 @@
 }
 
 @media (max-width: 43.75rem) {
+  .watermark { top: 3%; right: -18%; font-size: 13rem; opacity: .65; }
   .section { padding: 4.5rem 0; }
   .section::before { left: 1.25rem; }
   .frame { width: calc(100% - 2.5rem); }

@@ -11,7 +11,9 @@
 
 :global(.public-site-shell #about),
 :global(.public-site-shell #schedule),
+:global(.public-site-shell #access),
 :global(.public-site-shell #rules),
+:global(.public-site-shell #classification),
 :global(.public-site-shell #contact) {
   scroll-margin-top: 7.5rem;
 }
@@ -190,6 +192,20 @@
   padding: 0;
   border-top: 1px solid var(--cgp-border);
   background: linear-gradient(135deg, var(--cgp-surface-1), var(--cgp-carbon) 62%);
+  overflow: clip;
+}
+
+.footerBackdrop {
+  position: absolute;
+  right: -2vw;
+  bottom: 12%;
+  color: transparent;
+  font: 700 clamp(5rem, 11vw, 11rem)/.85 var(--cgp-font-display);
+  letter-spacing: -.055em;
+  white-space: nowrap;
+  -webkit-text-stroke: 1px rgb(255 255 255 / 4.5%);
+  pointer-events: none;
+  user-select: none;
 }
 
 .footer::before {
@@ -204,6 +220,8 @@
 }
 
 .footer :global(.footer-main) {
+  position: relative;
+  z-index: 1;
   width: min(var(--cgp-content-wide), calc(100% - max(2.5rem, 7vw)));
   margin-inline: auto;
   padding: 3.5rem 0 3rem;
@@ -213,11 +231,7 @@
   gap: 3rem;
 }
 
-.footer :global(.footer-main > *) {
-  transition: transform var(--cgp-duration-base) var(--cgp-ease-standard), opacity var(--cgp-duration-base) var(--cgp-ease-standard);
-}
-
-.footer :global(.footer-main > *:hover) { transform: translateY(-3px); }
+.footer :global(.footer-main > *) { transition: opacity var(--cgp-duration-base) var(--cgp-ease-standard); }
 
 .footer :global(.cpc-footer-logo) { width: 11rem; }
 .footer :global(.footer-statement span),
@@ -240,12 +254,18 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes footer-backdrop-shift {
+  from { transform: translate3d(0, 4rem, 0); }
+  to { transform: translate3d(-3vw, -2rem, 0); }
+}
+
 @supports (animation-timeline: view()) {
   .footer :global(.footer-main > *) {
     animation: footer-item-in both;
     animation-timeline: view();
     animation-range: entry 0 entry 34%;
   }
+  .footerBackdrop { animation: footer-backdrop-shift both linear; animation-timeline: view(); animation-range: entry 0 cover 100%; }
 }
 
 @media (max-width: 68rem) {

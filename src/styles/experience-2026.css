@@ -9,6 +9,7 @@
   --cgp-red: #f20d18;
   --cgp-red-deep: #a9000b;
   --cgp-red-soft: #ff6269;
+  --cgp-control-red: #cf0b15;
   --cgp-green: #36d9a0;
   --cgp-amber: #ffbd4a;
   --cgp-white: #f5f5f7;
@@ -167,7 +168,7 @@ summary {
 
 .button-primary {
   border-color: #ff4b53;
-  background: var(--cgp-red);
+  background: var(--cgp-control-red);
   box-shadow: 0 8px 24px rgb(242 13 24 / 14%);
 }
 

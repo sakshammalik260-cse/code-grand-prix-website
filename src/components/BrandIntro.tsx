@@ -60,6 +60,7 @@ export function BrandIntro({ children }: { children: ReactNode }) {
     const timer = window.setTimeout(() => {
       setVisible(false)
       document.documentElement.classList.remove('brand-intro-active')
+      window.dispatchEvent(new Event('cgp:intro-complete'))
       window.requestAnimationFrame(() => document.getElementById('main')?.focus({ preventScroll: true }))
     }, immediate || reducedMotion ? 140 : 1320)
     timers.current.push(timer)

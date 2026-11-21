@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import { Link } from 'react-router-dom'
 
 interface RaceWordmarkProps { className?: string }
@@ -13,11 +14,73 @@ export function ClubMark({ compact = false }: { compact?: boolean }) {
  return <Link to="/" className={`club-mark ${compact ? 'club-mark-compact' : ''}`} aria-label="Competitive Programming Club home"><img src="/branding/cpc-mark.webp" alt="Competitive Programming Club" className="cpc-navbar-mark" width="320" height="134" decoding="async"/><span className="sr-only">CPC</span></Link>
 }
 export function ClubLogo({className=''}:{className?:string}){
- return <img src="/branding/cpc-logo.webp" alt="CPC - Competitive Programming Club. Build, solve, improve." width="720" height="356" className={`cpc-full-logo ${className}`} loading="lazy" decoding="async"/>
+ return <img src="/branding/cpc-logo.webp" alt="CPC - Competitive Programming Club. Build, solve, improve." width="720" height="400" className={`cpc-full-logo ${className}`} loading="lazy" decoding="async"/>
 }
 
 export function CheckeredFlag({ className = '' }: { className?: string }) {
-  return <svg className={`racing-flag ${className}`} viewBox="0 0 400 240" fill="none" aria-hidden="true"><defs><pattern id="flag-checks" width="64" height="64" patternUnits="userSpaceOnUse" patternTransform="skewX(-13)"><rect width="64" height="64" fill="#11151c" /><path d="M0 0h32v32H0zm32 32h32v32H32z" fill="#e3e7ed" /></pattern><linearGradient id="flag-shade" x1="0" x2="400"><stop stopColor="#000" stopOpacity=".6" /><stop offset=".25" stopColor="#fff" stopOpacity=".1" /><stop offset=".42" stopColor="#000" stopOpacity=".55" /><stop offset=".63" stopColor="#fff" stopOpacity=".25" /><stop offset=".85" stopColor="#000" stopOpacity=".45" /><stop offset="1" stopColor="#fff" stopOpacity=".15" /></linearGradient><clipPath id="flag-clip"><path d="M37 24C115 0 145 66 224 39S329 6 396 28L353 219C278 197 242 237 171 215S77 177 0 202z" /></clipPath></defs><g clipPath="url(#flag-clip)"><path fill="url(#flag-checks)" d="M0 0h400v240H0z" /><path fill="url(#flag-shade)" d="M0 0h400v240H0z" /></g></svg>
+  const rawId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
+  const patternId = `flag-pattern-${rawId}`
+  const shadeId = `flag-shade-${rawId}`
+  const clipId = `flag-clip-${rawId}`
+  const maskId = `flag-mask-${rawId}`
+
+  return (
+    <svg
+      className={`racing-flag ${className}`}
+      viewBox="0 0 440 250"
+      fill="none"
+      aria-hidden="true"
+    >
+      <defs>
+        {/* Soft edge fade for natural blending into night track lighting */}
+        <linearGradient id={maskId} x1="0" y1="0" x2="440" y2="250" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#fff" stopOpacity="0.4" />
+          <stop offset="18%" stopColor="#fff" stopOpacity="0.88" />
+          <stop offset="60%" stopColor="#fff" stopOpacity="1" />
+          <stop offset="100%" stopColor="#fff" stopOpacity="0.9" />
+        </linearGradient>
+        <mask id={`mask-alpha-${rawId}`}>
+          <rect width="440" height="250" fill={`url(#${maskId})`} />
+        </mask>
+
+        {/* Crisp racing checks with carbon graphite and platinum silver */}
+        <pattern
+          id={patternId}
+          width="44"
+          height="44"
+          patternUnits="userSpaceOnUse"
+          patternTransform="skewX(-14) rotate(-3)"
+        >
+          <rect width="44" height="44" fill="#0d1017" />
+          <path d="M0 0h22v22H0zm22 22h22v22H22z" fill="#dbe0ec" />
+        </pattern>
+
+        {/* 3D silk cloth ripple shading: alternating crest highlights and trough shadows */}
+        <linearGradient id={shadeId} x1="0" y1="0" x2="440" y2="30" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#000" stopOpacity="0.75" />
+          <stop offset="13%" stopColor="#fff" stopOpacity="0.25" />
+          <stop offset="26%" stopColor="#000" stopOpacity="0.55" />
+          <stop offset="40%" stopColor="#000" stopOpacity="0.72" />
+          <stop offset="54%" stopColor="#fff" stopOpacity="0.32" />
+          <stop offset="68%" stopColor="#000" stopOpacity="0.60" />
+          <stop offset="82%" stopColor="#fff" stopOpacity="0.22" />
+          <stop offset="94%" stopColor="#000" stopOpacity="0.48" />
+          <stop offset="100%" stopColor="#000" stopOpacity="0.70" />
+        </linearGradient>
+
+        {/* Aerodynamic waving cloth contour with natural fluid curves */}
+        <clipPath id={clipId}>
+          <path d="M 25 34 C 90 8, 145 54, 225 32 S 350 6, 424 28 C 416 80, 432 140, 408 184 C 392 214, 384 235, 372 242 C 305 218, 255 248, 182 228 C 115 210, 65 220, 8 238 C 16 180, 14 100, 25 34 Z" />
+        </clipPath>
+      </defs>
+
+      <g clipPath={`url(#${clipId})`} mask={`url(#mask-alpha-${rawId})`}>
+        <path fill={`url(#${patternId})`} d="M0 0h440v250H0z" />
+        <path fill={`url(#${shadeId})`} d="M0 0h440v250H0z" />
+        <path fill={`url(#${shadeId})`} d="M0 0h440v250H0z" opacity="0.4" style={{ mixBlendMode: 'screen' }} />
+      </g>
+    </svg>
+  )
 }
 
 export function CircuitMap() {
