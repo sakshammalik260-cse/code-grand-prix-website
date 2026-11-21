@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode, PointerEvent, KeyboardEvent } from 'react'
 import { useRef } from 'react'
 
@@ -18,6 +18,7 @@ export interface ArenaWorkspaceProps {
 export function ArenaWorkspace({ topBar, problemNavigation, problemStatement, editor, editorActions, results, mobileNavigation, notice, statusBar, mobileView = 'code', focusMode = false }: ArenaWorkspaceProps) {
   const [height, setHeight] = useState(() => Math.min(280, Math.max(180, window.innerHeight * .3)))
   const drag = useRef<{ y: number; height: number } | null>(null)
+  useEffect(()=>{const clamp=()=>setHeight(current=>Math.max(130,Math.min(window.innerHeight*.42,current)));window.addEventListener('resize',clamp);return()=>window.removeEventListener('resize',clamp)},[])
   function resize(event: PointerEvent<HTMLDivElement>) {
     if (drag.current) setHeight(Math.max(130, Math.min(window.innerHeight * .42, drag.current.height + drag.current.y - event.clientY)))
   }

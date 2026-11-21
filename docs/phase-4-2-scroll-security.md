@@ -4,7 +4,7 @@
 
 The existing About introduction was replaced by one official About CPC section, immediately after the unchanged cinematic hero and before Schedule. The About link retains `/#about`. The existing schedule, journey, rules, final CTA and contact/footer remain accessible.
 
-`src/data/cpc.ts` contains all four supplied paragraphs verbatim. The section uses those strings directly; the final paragraph is highlighted as the club philosophy. The section displays the original `public/branding/cpc-logo-transparent.png` through the existing ClubLogo component, with unchanged pixels/colors, meaningful alt text and object-fit contain. It includes BUILD, SOLVE and IMPROVE cards using Lucide icons, brief descriptions grounded in the supplied text, and subtle green hover accents.
+`src/data/cpc.ts` contains all four supplied paragraphs verbatim. The section uses those strings directly; the final paragraph is highlighted as the club philosophy. The section displays the optimized `public/branding/cpc-logo.webp` through the existing ClubLogo component, with meaningful alt text and object-fit contain. It includes BUILD, SOLVE and IMPROVE cards using Lucide icons, brief descriptions grounded in the supplied text, and subtle green hover accents.
 
 The desktop composition has a logo column and a description column, followed by three cards. Mobile stacks the logo, text and cards. Motion viewport reveals are gentle and run once. When prefers-reduced-motion is enabled, initial content is visible and movement/transition durations are disabled. No scroll-jacking, snap points, new images or dependencies were introduced.
 

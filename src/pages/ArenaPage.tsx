@@ -23,7 +23,8 @@ import { useArenaExecution } from '../hooks/useArenaExecution'
 import { useRaceClock } from '../hooks/useRaceClock'
 import { useFullscreenStatus } from '../hooks/useFullscreenStatus'
 import { arenaServices, isArenaMockMode } from '../services/arena'
-import { errorMessage, mockControls } from '../services/arena/mockState'
+import { mockControls } from '../services/arena/mockState'
+import { errorMessage } from '../services/async'
 import { isLanguageId, starterCode } from '../data/starterCode'
 import type { CodeExecutionRequest, ContestPhase, ContestState, LanguageId, Problem, ProblemSummary } from '../types/arena'
 import type { ReactNode } from 'react'
@@ -49,12 +50,17 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
   const [progress, setProgress] = useState(initial.progress)
   const [busy, setBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [noticeError, setNoticeError] = useState('')
+  const [raceError, setRaceError] = useState('')
+  const [progressError, setProgressError] = useState(initial.progressWarning || '')
   const [detail, setDetail] = useState<{ id: string; problem?: Problem; error?: string } | null>(null)
   const [detailAttempt, setDetailAttempt] = useState(0)
   const [focusMode, setFocusMode] = useState(false)
   const controllers = useRef(new Set<AbortController>())
   const alive = useRef(true)
+  const refreshInFlight = useRef(false)
+  const progressInFlight = useRef(false)
+  const progressRefreshQueued = useRef(false)
+  const progressQueuedSignal = useRef<AbortSignal | undefined>(undefined)
   const fullscreen = useFullscreenStatus()
   const clock = useRaceClock(contest)
   const selectedId = params.get('problem') || (problems.some(p=>p.id==='p2')?'p2':problems[0]?.id || '')
@@ -66,6 +72,7 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
   const editingLocked = monitoring.locked || !!monitoring.session && !monitoring.session.policy.allowEditing
   const development = import.meta.env.DEV && isArenaMockMode && MonitoringDevPanel ? <Suspense fallback={null}><MonitoringDevPanel client={monitoring.client} session={monitoring.session} /></Suspense> : null
   const restoreFullscreen = () => { void monitoring.client.permissionAction(fullscreen.activate) }
+  const toggleFullscreen = () => { if(fullscreen.active)void fullscreen.toggle();else void monitoring.client.permissionAction(fullscreen.activate) }
   const decorate = (workspace: ReactNode) => <div className="monitoring-arena-shell"><div className="monitoring-underlay" inert={overlayVisible} aria-hidden={overlayVisible ? true : undefined}>{workspace}</div>{overlayVisible && <ViolationLockOverlay session={monitoring.session} connection={monitoring.connection} pending={monitoring.pending} error={monitoring.error || fullscreen.error} camera={monitoring.camera.status} cameraPending={monitoring.camera.pending} cameraError={monitoring.camera.error} fullscreen={fullscreen.active} onCamera={() => { void monitoring.recoverCamera() }} onFullscreen={restoreFullscreen} onRefresh={() => { void monitoring.client.refresh() }} onSignOut={signOut} developmentControls={development} />}{!overlayVisible && development}</div>
   const summary = problems.find(problem => problem.id === selectedId)
   useEffect(() => {
@@ -82,14 +89,16 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
     return () => controller.abort()
   }, [selectedId, summary, detailAttempt])
   const refreshContest = useCallback(async (quiet = false) => {
+    if (refreshInFlight.current) return
+    refreshInFlight.current = true
     const controller = new AbortController()
     controllers.current.add(controller)
     if (!quiet) setRefreshing(true)
     try {
       const [next,nextProblems] = await Promise.all([arenaServices.getContest(controller.signal),arenaServices.listProblems(controller.signal)])
-      if (alive.current && !controller.signal.aborted) { setContest(next); setProblems(nextProblems); setDetailAttempt(value=>value+1); setNoticeError('') }
-    } catch (reason) { if (alive.current && !controller.signal.aborted) setNoticeError('Race status could not be refreshed. ' + errorMessage(reason)) }
-    finally { controllers.current.delete(controller); if (alive.current && !quiet) setRefreshing(false) }
+      if (alive.current && !controller.signal.aborted) { setContest(next); setProblems(nextProblems); setDetailAttempt(value=>value+1); setRaceError('') }
+    } catch (reason) { if (alive.current && !controller.signal.aborted) setRaceError('Race status could not be refreshed. ' + errorMessage(reason)) }
+    finally { refreshInFlight.current = false; controllers.current.delete(controller); if (alive.current && !quiet) setRefreshing(false) }
   }, [])
   useEffect(() => {
     const timer = window.setInterval(() => { void refreshContest(true) }, 15000)
@@ -106,19 +115,28 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
     return () => window.removeEventListener('keydown', toggleFocus, true)
   }, [])
   const refreshProgress = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const next = await arenaServices.getProgress(contest.id, driverId, signal)
-      if (alive.current && !signal?.aborted) setProgress(next)
-    } catch (reason) { if (alive.current && !signal?.aborted) setNoticeError('Progress is temporarily unavailable. ' + errorMessage(reason)) }
+    if (progressInFlight.current) { progressRefreshQueued.current = true; progressQueuedSignal.current=signal; return }
+    progressInFlight.current = true
+    let activeSignal=signal
+    try { do {
+      progressRefreshQueued.current=false
+      const requestController=new AbortController();const forwardAbort=()=>requestController.abort();if(activeSignal?.aborted)requestController.abort();else activeSignal?.addEventListener('abort',forwardAbort,{once:true});controllers.current.add(requestController)
+      try { const next = await arenaServices.getProgress(contest.id, driverId, requestController.signal); if (alive.current && !requestController.signal.aborted) { setProgress(next); setProgressError('') } }
+      catch (reason) { if (alive.current && !activeSignal?.aborted) setProgressError('Progress is temporarily unavailable. ' + errorMessage(reason)) }
+      finally { activeSignal?.removeEventListener('abort',forwardAbort);controllers.current.delete(requestController) }
+      activeSignal=progressQueuedSignal.current;progressQueuedSignal.current=undefined
+    } while(progressRefreshQueued.current&&alive.current) }
+    finally { progressInFlight.current = false }
   }, [contest.id, driverId])
   const selectProblem = useCallback((id: string) => setParams(previous => { const next = new URLSearchParams(previous); next.set('problem',id); return next }, { replace: true }), [setParams])
   const selectLanguage = useCallback((id: LanguageId) => setParams(previous => { const next = new URLSearchParams(previous); next.set('lang',id); return next }, { replace: true }), [setParams])
   function retryProblem() { setDetail(null); setDetailAttempt(value => value + 1) }
-  function changeMockPhase(phase: ContestPhase) { setContest(mockControls.setContestPhase(phase)); setNoticeError('') }
-  const header = <ArenaHeader contest={{ ...contest, status: clock.effectivePhase }} fullscreen={fullscreen.active} onFullscreen={restoreFullscreen} onRefresh={() => { void refreshContest(); void monitoring.client.refresh() }} refreshing={refreshing} monitoring={<MonitoringStatus camera={monitoring.camera.status} fullscreen={fullscreen.active} session={monitoring.session} connection={monitoring.connection} locked={monitoring.locked} />} focusMode={focusMode} onFocusMode={() => setFocusMode(current => !current)} />
+  function changeMockPhase(phase: ContestPhase) { setContest(mockControls.setContestPhase(phase)); setRaceError('') }
+  const header = <ArenaHeader contest={{ ...contest, status: clock.effectivePhase }} clock={clock} fullscreen={fullscreen.active} onFullscreen={toggleFullscreen} onRefresh={() => { void refreshContest(); void monitoring.client.refresh() }} refreshing={refreshing} monitoring={<MonitoringStatus camera={monitoring.camera.status} fullscreen={fullscreen.active} session={monitoring.session} connection={monitoring.connection} locked={monitoring.locked} />} focusMode={focusMode} onFocusMode={() => setFocusMode(current => !current)} />
   const sidebar = <ProblemNavigation problems={problems} selected={selectedId} progress={progress} busy={busy || monitoring.locked || !!monitoring.session && !monitoring.session.policy.allowNavigation} round={contest.round} onSelect={selectProblem} />
   const phaseText = clock.effectivePhase === 'WAITING' ? 'The race has not started. You can prepare your draft; Run and Submit unlock when race control starts the contest.' : clock.effectivePhase === 'PAUSED_BY_ORGANIZER' ? 'Paused by organizer. Your draft remains editable; Run and Submit are unavailable until the race resumes.' : clock.ended ? 'The chequered flag is out. Submissions are closed; your local drafts remain available.' : !clock.canSubmit ? 'Race timing is unavailable. Refresh race status before submitting.' : ''
-  const notice = <>{(!monitoring.authorized || !monitoring.ready) && !overlayVisible && <div className="monitoring-health-banner" role="status"><span>{monitoring.connection !== 'CONNECTED' ? monitoring.error || 'Verifying competition session...' : monitoring.session?.status === 'FINISHED' ? 'The competition session is finished. Execution is closed; your draft remains available.' : !monitoring.ready ? 'Restore camera and fullscreen before executing code. Your draft remains available.' : 'Race-control authorization is required.'}</span>{monitoring.camera.status !== 'ACTIVE' && <button onClick={() => { void monitoring.recoverCamera() }} disabled={monitoring.camera.pending}>{monitoring.camera.pending ? 'Requesting camera...' : 'Restore camera'}</button>}{!fullscreen.active && <button onClick={restoreFullscreen}>Re-enter fullscreen</button>}<button onClick={() => { void monitoring.client.refresh() }}>Refresh session</button>{monitoring.connection === 'AUTH_EXPIRED' && <button onClick={signOut}>Sign in again</button>}</div>}{!permitted.includes(language) && <div className="arena-state-notice state-error" role="status">This language is not permitted. Select an available language; your existing draft remains saved.</div>}{phaseText && <div className={'arena-state-notice state-' + clock.effectivePhase.toLowerCase()} role="status"><CircleHelp size={14} /><span>{phaseText}</span></div>}{(noticeError || fullscreen.error) && <div className="arena-state-notice state-error" role="alert"><AlertCircle size={14} /><span>{noticeError || fullscreen.error}</span><button onClick={() => { if (noticeError) void refreshContest().then(() => refreshProgress()); else void fullscreen.activate() }}>Retry</button></div>}</>
+  const operationalError=raceError||progressError
+  const notice = <>{(!monitoring.authorized || !monitoring.ready) && !overlayVisible && <div className="monitoring-health-banner" role="status"><span>{monitoring.connection !== 'CONNECTED' ? monitoring.error || 'Verifying competition session...' : monitoring.session?.status === 'FINISHED' ? 'The competition session is finished. Execution is closed; your draft remains available.' : !monitoring.ready ? 'Restore camera and fullscreen before executing code. Your draft remains available.' : 'Race-control authorization is required.'}</span>{monitoring.camera.status !== 'ACTIVE' && <button onClick={() => { void monitoring.recoverCamera() }} disabled={monitoring.camera.pending}>{monitoring.camera.pending ? 'Requesting camera...' : 'Restore camera'}</button>}{!fullscreen.active && <button onClick={restoreFullscreen}>Re-enter fullscreen</button>}<button onClick={() => { void monitoring.client.refresh() }}>Refresh session</button>{monitoring.connection === 'AUTH_EXPIRED' && <button onClick={signOut}>Sign in again</button>}</div>}{!permitted.includes(language) && <div className="arena-state-notice state-error" role="status">This language is not permitted. Select an available language; your existing draft remains saved.</div>}{phaseText && <div className={'arena-state-notice state-' + clock.effectivePhase.toLowerCase()} role="status"><CircleHelp size={14} /><span>{phaseText}</span></div>}{(operationalError || fullscreen.error) && <div className={`arena-state-notice ${progressError&&!raceError?'state-paused_by_organizer':'state-error'}`} role={raceError||fullscreen.error?'alert':'status'}><AlertCircle size={14} /><span>{operationalError || fullscreen.error}</span><button onClick={() => { if(raceError)void refreshContest();else if(progressError)void refreshProgress();else void fullscreen.activate() }}>Retry</button></div>}</>
   const mockControlsUi = import.meta.env.DEV && isArenaMockMode && MockArenaControls ? <Suspense fallback={null}><MockArenaControls busy={busy} onPhase={changeMockPhase} onExpiry={() => setContest(mockControls.finishInFiveSeconds())} /></Suspense> : null
   if (!summary) return decorate(<ArenaWorkspace focusMode={focusMode} topBar={header} problemNavigation={sidebar} problemStatement={<div className="arena-inline-error"><AlertCircle size={28} /><h2>Problem not found</h2><p>{problems.length ? 'Choose a valid problem from the left sidebar.' : 'No problems have been released for this contest.'}</p>{problems[0] && <button className="arena-quiet-button" onClick={() => selectProblem(problems[0].id)}>Open first problem</button>}</div>} editor={<div className="arena-pane-loading"><FileCode2 size={27} /><p>Select a problem to restore its draft.</p></div>} editorActions={null} results={null} notice={notice} statusBar={<ArenaStatusBar simulation={contest.simulation} controls={mockControlsUi} />} />)
   const problem = detail?.id === selectedId ? detail.problem || null : null
@@ -141,12 +159,14 @@ function ArenaDocument({ referenceAllowed, sessionId, editingLocked, contest, dr
   const [tab, setTab] = useState<ResultsTab>('samples')
   const [mobileView, setMobileView] = useState<'statement' | 'code' | 'results'>('code')
   const request = useMemo<CodeExecutionRequest>(() => ({ sessionId, contestId: contest.id, driverId, problemId, language, sourceCode: draft.code, ...(inputMode === 'custom' ? { customInput } : {}) }), [sessionId, contest.id, driverId, problemId, language, draft.code, inputMode, customInput])
-  const execution = useArenaExecution({ request, allowed: canAct, onBusyChange, onProgress })
+  const execution = useArenaExecution({ request, allowed: canAct, simulation:contest.simulation, onBusyChange, onProgress })
   const { run: executeRun, submit: executeSubmit } = execution
   const saveDraft = draft.save
+  const retryDraft = draft.retry
+  const draftStatus = draft.status
   const run = useCallback(() => { setTab('output'); if (window.innerWidth <= 1000) setMobileView('results'); void executeRun() }, [executeRun])
   const submit = useCallback(() => { setTab('submissions'); if (window.innerWidth <= 1000) setMobileView('results'); void executeSubmit() }, [executeSubmit])
-  const save = useCallback(() => saveDraft(), [saveDraft])
+  const save = useCallback(() => { if(draftStatus==='error')retryDraft();else saveDraft() }, [draftStatus,retryDraft,saveDraft])
   const result = execution.lastAction === 'submit' ? execution.submission?.execution || null : execution.runResult
   function changeTab(next: ResultsTab) { setTab(next); if (next === 'samples' || next === 'custom') setInputMode(next) }
   const penaltyChanged=useCallback(()=>{void onProgress()},[onProgress])
@@ -154,5 +174,5 @@ function ArenaDocument({ referenceAllowed, sessionId, editingLocked, contest, dr
     <RaceControlNotifications operation={execution.operation} runResult={execution.runResult} submission={execution.submission} error={execution.error} />
     <div className={`arena-mobile-navigation ${focusMode ? 'is-focus-mode' : ''}`} aria-label="Workspace panels">{(['statement','code','results'] as const).map(view => <button key={view} aria-pressed={mobileView === view} onClick={() => setMobileView(view)}>{view === 'statement' ? 'Problem' : view === 'code' ? 'Code editor' : 'Results'}</button>)}</div>
   </>
-  return <ArenaWorkspace topBar={header} problemNavigation={sidebar} problemStatement={<><ProblemStatement problem={problem} error={problemError} onRetry={onRetryProblem} />{problem&&<RaceAssist key={problemId} problemId={problemId} sessionId={sessionId} allowed={canAct} onPenalty={penaltyChanged}/>}</>} editor={<CodeEditor allowedLanguages={problem?.allowedLanguages || []} readOnly={editingLocked} language={language} code={draft.code} onChange={draft.update} onLanguage={onLanguage} saveStatus={draft.status} onSave={save} busy={!!execution.operation} onRun={run} onSubmit={submit} />} editorActions={<><SyntaxGuide language={language} allowed={referenceAllowed}/><button className="arena-input-selector" onClick={() => { setTab(inputMode === 'custom' ? 'custom' : 'samples'); setMobileView('results') }}><FlaskConical size={12} /><span>{inputMode === 'custom' ? 'Custom input' : 'Public samples'}</span></button><span className="arena-action-spacer" /><button className="arena-run-button" onClick={run} disabled={!canAct || !!execution.operation} title="Run Code (Ctrl/Cmd+Enter)">{execution.operation === 'run' ? <LoaderCircle size={14} className="spin" /> : <Play size={13} />}Run Code</button><button className="arena-submit-button" onClick={submit} disabled={!canAct || !!execution.operation} title="Submit Code (Ctrl/Cmd+Shift+Enter)">{execution.operation === 'submit' ? <LoaderCircle size={14} className="spin" /> : <Send size={13} />}Submit Code</button></>} results={<ResultsPanel problem={problem} tab={tab} onTab={changeTab} customInput={customInput} onCustomInput={setCustomInput} execution={result} submission={execution.submission} history={execution.history} operation={execution.operation} submitting={execution.submitting} error={execution.error} lastAction={execution.lastAction} onRun={run} onCheckResult={execution.checkResult} canRun={canAct} simulation={contest.simulation} />} notice={notice} mobileNavigation={mobileNavigation} mobileView={mobileView} statusBar={<ArenaStatusBar simulation={contest.simulation} controls={mockControlsUi} />} />
+  return <ArenaWorkspace topBar={header} problemNavigation={sidebar} problemStatement={<><ProblemStatement problem={problem} error={problemError} onRetry={onRetryProblem} />{problem&&<RaceAssist key={problemId} contestId={contest.id} problemId={problemId} sessionId={sessionId} allowed={canAct} onPenalty={penaltyChanged}/>}</>} editor={<CodeEditor allowedLanguages={problem?.allowedLanguages || []} readOnly={editingLocked} language={language} code={draft.code} onChange={draft.update} onLanguage={onLanguage} saveStatus={draft.status} onSave={save} busy={!!execution.operation} onRun={run} onSubmit={submit} />} editorActions={<><SyntaxGuide language={language} allowed={referenceAllowed}/><button className="arena-input-selector" onClick={() => { setTab(inputMode === 'custom' ? 'custom' : 'samples'); setMobileView('results') }}><FlaskConical size={12} /><span>{inputMode === 'custom' ? 'Custom input' : 'Public samples'}</span></button><span className="arena-action-spacer" /><button className="arena-run-button" onClick={run} disabled={!canAct || !!execution.operation} title="Run Code (Ctrl/Cmd+Enter)">{execution.operation === 'run' ? <LoaderCircle size={14} className="spin" /> : <Play size={13} />}Run Code</button><button className="arena-submit-button" onClick={submit} disabled={!canAct || !!execution.operation} title="Submit Code (Ctrl/Cmd+Shift+Enter)">{execution.operation === 'submit' ? <LoaderCircle size={14} className="spin" /> : <Send size={13} />}Submit Code</button></>} results={<ResultsPanel problem={problem} tab={tab} onTab={changeTab} customInput={customInput} onCustomInput={setCustomInput} execution={result} submission={execution.submission} history={execution.history} operation={execution.operation} submitting={execution.submitting} error={execution.error} lastAction={execution.lastAction} onRun={run} onCheckResult={execution.checkResult} canRun={canAct} simulation={contest.simulation} />} notice={notice} mobileNavigation={mobileNavigation} mobileView={mobileView} statusBar={<ArenaStatusBar simulation={contest.simulation} controls={mockControlsUi} />} />
 }

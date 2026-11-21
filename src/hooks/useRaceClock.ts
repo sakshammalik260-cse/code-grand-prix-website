@@ -4,6 +4,7 @@ import type { ContestPhase, ContestState } from '../types/arena'
 export interface RaceClock {
   seconds: number
   label: string
+  valid: boolean
   effectivePhase: ContestPhase
   canSubmit: boolean
   ended: boolean
@@ -13,7 +14,7 @@ export function useRaceClock({ contestStartTime, contestEndTime, serverTime, sta
   const [tick, setTick] = useState({ version: serverTime, elapsed: 0 })
   useEffect(() => {
     const anchor = performance.now()
-    const timer = window.setInterval(() => setTick({ version: serverTime, elapsed: performance.now() - anchor }), 250)
+    const timer = window.setInterval(() => setTick({ version: serverTime, elapsed: performance.now() - anchor }), 1000)
     return () => window.clearInterval(timer)
   }, [serverTime])
   // The server snapshot is the anchor. performance.now avoids local wall-clock edits between refreshes.
@@ -22,8 +23,8 @@ export function useRaceClock({ contestStartTime, contestEndTime, serverTime, sta
   const target = Date.parse(status === 'WAITING' ? contestStartTime : contestEndTime)
   const valid = Number.isFinite(target) && Number.isFinite(serverNow)
   const seconds = valid ? Math.max(0, Math.ceil((target - serverNow) / 1000)) : 0
-  const ended = status === 'FINISHED' || (status === 'LIVE' && (!valid || serverNow >= target))
+  const ended = status === 'FINISHED' || (status === 'LIVE' && valid && serverNow >= target)
   const effectivePhase = ended ? 'FINISHED' : status
   const label = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60].map(value => String(value).padStart(2, '0')).join(':')
-  return { seconds: ended ? 0 : seconds, label: ended ? '00:00:00' : label, effectivePhase, canSubmit: effectivePhase === 'LIVE' && valid, ended }
+  return { seconds: ended ? 0 : seconds, label: !valid ? '--:--:--' : ended ? '00:00:00' : label, valid, effectivePhase, canSubmit: effectivePhase === 'LIVE' && valid, ended }
 }

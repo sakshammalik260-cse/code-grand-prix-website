@@ -3,13 +3,14 @@ import { ShieldX } from 'lucide-react'
 import { useSession } from '../hooks/useSession'
 import { canAccess, roleHome } from '../services/access'
 import type { Role } from '../types'
+import { LoadingState, StatePanel } from './Ui'
 export function RequireRole({ roles }: { roles: Role[] }) {
   const {driver,loading,authError}=useSession();const location=useLocation()
-  if(loading)return <div className="arena-load-screen" role="status">Verifying your pit pass...</div>
+  if(loading)return <LoadingState label="Verifying your pit pass" detail="Checking your championship role and session." />
   if(!driver)return <Navigate to="/login" replace state={{from:location.pathname+location.search,authError}} />
   return canAccess(driver.role,roles)?<Outlet />:<AccessDeniedPage />
 }
 export function AccessDeniedPage() {
   const {driver}=useSession()
-  return <section className="access-denied"><span className="admin-eyebrow">403 / RESTRICTED PADDOCK</span><ShieldX size={56}/><h1>This area needs a different pit pass.</h1><p>Your account does not have permission to enter this part of Race Control.</p><Link className="button button-primary" to={driver?roleHome(driver.role):'/login'}>RETURN TO YOUR DASHBOARD</Link></section>
+  return <StatePanel className="access-denied" eyebrow="403 / Restricted paddock" title="This area needs a different pit pass." description="Your account does not have permission to enter this part of Race Control." icon={<ShieldX size={32}/>} tone="critical" action={<Link className="button button-primary" to={driver?roleHome(driver.role):'/login'}>RETURN TO YOUR DASHBOARD</Link>} />
 }

@@ -20,6 +20,7 @@ export function useDraft(scope: DraftScope, starter: string) {
     dirty.current = !success
     if (announce && mounted.current) setStatus(success ? 'saved' : 'error')
   }, [key])
+  const retry = useCallback(() => { dirty.current = true; save() }, [save])
   useEffect(() => {
     mounted.current = true
     const onHide = () => save(false)
@@ -45,5 +46,5 @@ export function useDraft(scope: DraftScope, starter: string) {
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(() => save(), 600)
   }, [save])
-  return { code, update, save, status, storageKey: key }
+  return { code, update, save, retry, status, storageKey: key }
 }

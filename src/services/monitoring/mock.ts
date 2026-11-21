@@ -63,8 +63,10 @@ export const mockMonitoringService: MonitoringService = {
     const viewer = await this.getViewer(signal)
     if (viewer.role !== 'VOLUNTEER' && viewer.role !== 'ADMIN') throw new MonitoringTransportError('Sign in with a volunteer or admin development account to resolve mock incidents.','AUTH_EXPIRED')
     return ledgerTransaction<ResolutionResponse>(true,ledger => {
-      const incident = ledger.incidents.find(item => item.id === id)
-      if (!incident) throw new Error('This incident is unavailable. Refresh the review list.')
+       const incident = ledger.incidents.find(item => item.id === id)
+       if (!incident) throw new Error('This incident is unavailable. Refresh the review list.')
+       if (incident.reviewStatus !== 'OPEN') throw new MonitoringTransportError('This incident already has a terminal decision. Refresh the review list.','CONFLICT')
+       if (request.note.trim().length < 8) throw new Error('Add a brief operator note before resolving this incident.')
       const session = ledger.sessions[key(incident)]
       if (session.revision !== request.expectedSessionRevision) throw new MonitoringTransportError('Session changed while you reviewed it. Refresh and review the latest incident.','CONFLICT')
       if (request.decision !== 'AUTHORIZE_RESUME') incident.blocking = true

@@ -1,180 +1,96 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { useReducedMotion } from 'motion/react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { RaceWordmark } from './RacingIdentity'
 import '../styles/brand-intro.css'
 
 export const BRAND_INTRO_SESSION_KEY = 'cgp-brand-intro-v1'
 export const BRAND_INTRO_DISABLE_KEY = 'cgp-brand-intro-disabled'
 
-function isHomepage() {
-  if (typeof window === 'undefined') return false
-  const path = window.location.pathname.replace(/\/+$/, '') || '/'
-  return path === '/'
-}
-
-function hasPlayed() {
-  try {
-    return sessionStorage.getItem(BRAND_INTRO_SESSION_KEY) === 'seen'
-  } catch {
-    return false
-  }
+function storageValue(key: string) {
+  try { return sessionStorage.getItem(key) } catch { return null }
 }
 
 function shouldShowIntro() {
-  if (!isHomepage()) return false
-
-  if (typeof window !== 'undefined') {
-    const query = new URLSearchParams(window.location.search).get('intro')
-    if (query === '0') return false
-    if (query === '1') return true
-  }
-
-  try {
-    if (sessionStorage.getItem(BRAND_INTRO_DISABLE_KEY) === '1') return false
-    if (hasPlayed()) {
-      if (import.meta.env.VITE_REPLAY_BRAND_INTRO === 'true') return true
-      return false
-    }
-  } catch {
-    // Continue if storage is restricted
-  }
-
-  return true
+  if (typeof window === 'undefined') return false
+  const path = window.location.pathname.replace(/\/+$/, '') || '/'
+  if (path !== '/') return false
+  const query = new URLSearchParams(window.location.search).get('intro')
+  if (query === '0' || storageValue(BRAND_INTRO_DISABLE_KEY) === '1') return false
+  if (query === '1' || import.meta.env.VITE_REPLAY_BRAND_INTRO === 'true') return true
+  return storageValue(BRAND_INTRO_SESSION_KEY) !== 'seen'
 }
 
 function rememberPlayed() {
-  try {
-    sessionStorage.setItem(BRAND_INTRO_SESSION_KEY, 'seen')
-  } catch {
-    // Storage restrictions should never break the experience
-  }
+  try { sessionStorage.setItem(BRAND_INTRO_SESSION_KEY, 'seen') } catch { /* Restricted storage must not block entry. */ }
+}
+
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(() => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduced(query.matches)
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return reduced
 }
 
 export function BrandIntro({ children }: { children: ReactNode }) {
-  const reducedMotion = useReducedMotion() === true
+  const reducedMotion = usePrefersReducedMotion()
   const [visible, setVisible] = useState(shouldShowIntro)
   const [exiting, setExiting] = useState(false)
   const [fastExit, setFastExit] = useState(false)
-  const [progress, setProgress] = useState(15)
   const [lights, setLights] = useState(0)
   const [lightsOut, setLightsOut] = useState(false)
-  const [statusText, setStatusText] = useState('RACE CONTROL // INITIALIZING TELEMETRY')
-  const exitingRef = useRef(false)
   const timers = useRef<number[]>([])
+  const finishing = useRef(false)
   const skipButton = useRef<HTMLButtonElement>(null)
 
   const clearTimers = useCallback(() => {
-    for (const id of timers.current) {
-      window.clearTimeout(id)
-    }
+    timers.current.forEach(window.clearTimeout)
     timers.current = []
   }, [])
 
   const finish = useCallback((immediate = false) => {
-    if (exitingRef.current) return
-    exitingRef.current = true
+    if (finishing.current) return
+    finishing.current = true
     rememberPlayed()
     clearTimers()
-
-    if (immediate || reducedMotion) {
-      setFastExit(true)
-      setExiting(true)
-      const timer = window.setTimeout(() => {
-        setVisible(false)
-        document.documentElement.classList.remove('brand-intro-active')
-      }, reducedMotion ? 40 : 180)
-      timers.current.push(timer)
-      return
-    }
-
+    setFastExit(immediate || reducedMotion)
     setExiting(true)
     const timer = window.setTimeout(() => {
       setVisible(false)
       document.documentElement.classList.remove('brand-intro-active')
-    }, 680)
+      window.requestAnimationFrame(() => document.getElementById('main')?.focus({ preventScroll: true }))
+    }, immediate || reducedMotion ? 140 : 560)
     timers.current.push(timer)
   }, [clearTimers, reducedMotion])
 
   useEffect(() => {
-    if (!visible) {
-      document.documentElement.classList.remove('brand-intro-active')
-      return
-    }
-
+    if (!visible) return
     document.documentElement.classList.add('brand-intro-active')
+    window.requestAnimationFrame(() => skipButton.current?.focus({ preventScroll: true }))
 
     if (reducedMotion) {
-      const timer = window.setTimeout(() => finish(true), 300)
+      const timer = window.setTimeout(() => finish(true), 450)
       timers.current.push(timer)
-      return () => {
-        window.clearTimeout(timer)
-        document.documentElement.classList.remove('brand-intro-active')
-      }
+      return () => { window.clearTimeout(timer); document.documentElement.classList.remove('brand-intro-active') }
     }
 
-    const schedule = (callback: () => void, delayMs: number) => {
-      const id = window.setTimeout(callback, delayMs)
-      timers.current.push(id)
+    const schedule = (callback: () => void, delay: number) => {
+      const timer = window.setTimeout(callback, delay)
+      timers.current.push(timer)
     }
-
-    // Telemetry & Lights sequence with authentic F1 timing
-    schedule(() => {
-      setProgress(35)
-      setStatusText('CALIBRATING TRACK SENSORS...')
-    }, 1100)
-
-    schedule(() => {
-      setProgress(60)
-      setStatusText('GRID TELEMETRY ESTABLISHED')
-    }, 1600)
-
-    // Formula 1 starting sequence: 5 red lights turn ON sequentially
-    schedule(() => {
-      setProgress(75)
-      setStatusText('STARTING SEQUENCE INITIATED')
-      setLights(1)
-    }, 2050)
-
-    schedule(() => {
-      setProgress(82)
-      setLights(2)
-    }, 2250)
-
-    schedule(() => {
-      setProgress(89)
-      setLights(3)
-    }, 2450)
-
-    schedule(() => {
-      setProgress(95)
-      setLights(4)
-    }, 2650)
-
-    schedule(() => {
-      setProgress(100)
-      setLights(5)
-      setStatusText('GRID ASSEMBLED // ALL LIGHTS ON')
-    }, 2850)
-
-    // LIGHTS OUT: Tense pause then sudden extinguish
-    schedule(() => {
-      setLightsOut(true)
-      setStatusText('LIGHTS OUT & AWAY WE GO!')
-    }, 3350)
-
-    // Launch wipe into hero grid
-    schedule(() => {
-      finish(false)
-    }, 3750)
+    ;[1, 2, 3, 4, 5].forEach((value, index) => schedule(() => setLights(value), 1280 + index * 180))
+    schedule(() => setLightsOut(true), 2380)
+    schedule(() => finish(false), 2700)
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' || event.key === ' ' || event.key === 'Enter') {
-        finish(true)
-      }
+      if (event.key === 'Tab') { event.preventDefault(); skipButton.current?.focus(); return }
+      if (!['Escape', ' ', 'Enter'].includes(event.key)) return
+      event.preventDefault()
+      finish(true)
     }
     window.addEventListener('keydown', onKeyDown)
-
     return () => {
       clearTimers()
       window.removeEventListener('keydown', onKeyDown)
@@ -182,113 +98,39 @@ export function BrandIntro({ children }: { children: ReactNode }) {
     }
   }, [clearTimers, finish, reducedMotion, visible])
 
+  const status = lightsOut ? 'LIGHTS OUT // ENTERING THE GRID' : lights ? `START SEQUENCE // ${lights} OF 5` : 'RACE CONTROL // SYNCHRONIZING GRID'
+
   return <>
-    {visible && <section
-      className={`brand-intro ${exiting ? 'is-exiting' : ''} ${fastExit ? 'is-fast-exit' : ''} ${reducedMotion ? 'is-reduced' : ''}`}
-      aria-label="Code Grand Prix introduction sequence"
-      role="dialog"
-      aria-modal="true"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) finish(true)
-      }}
-    >
-      <div className="brand-intro-atmosphere" aria-hidden="true"><span /><span /><span /></div>
-      <div className="brand-intro-checks" aria-hidden="true" />
-      <div className="brand-intro-ignition" aria-hidden="true"><i /></div>
-      <div className="brand-intro-stripes" aria-hidden="true"><i /><i /><i /></div>
+    {visible && <section className={`brand-intro ${exiting ? 'is-exiting' : ''} ${fastExit ? 'is-fast-exit' : ''} ${lightsOut ? 'is-lights-out' : ''}`} role="dialog" aria-modal="true" aria-label="Code Grand Prix introduction">
+      <div className="brand-intro-grid" aria-hidden="true" />
+      <div className="brand-intro-track" aria-hidden="true"><i /><i /><i /></div>
+      <div className="brand-intro-corner brand-intro-corner-left" aria-hidden="true" />
+      <div className="brand-intro-corner brand-intro-corner-right" aria-hidden="true" />
+
+      <header className="brand-intro-broadcast">
+        <div className="brand-intro-promoter"><img src="/branding/cpc-mark.webp" width="320" height="134" alt="Competitive Programming Club" /><span>CPC CLUB<small>PRESENTS</small></span></div>
+        <span className="brand-intro-round">CHAMPIONSHIP 2026 <i /> ROUND 01</span>
+      </header>
 
       <div className="brand-intro-stage">
-        <div className="brand-intro-presenter">
-          <div className="presenter-mark-wrap">
-            <img
-              src="/branding/cpc-mark-transparent.png"
-              alt="Competitive Programming Club"
-              width="1590"
-              height="665"
-            />
-          </div>
-          <div className="presenter-meta">
-            <span className="presenter-org">COMPETITIVE PROGRAMMING CLUB</span>
-            <span className="presenter-pres">PRESENTS CHAMPIONSHIP SEASON</span>
-          </div>
-          <span className="presenter-status">
-            <i className="status-live-pulse" />
-            LIVE
-          </span>
-        </div>
+        <p className="brand-intro-kicker"><span /> THE ULTIMATE CODING CIRCUIT <span /></p>
+        <div className="brand-intro-title"><RaceWordmark className="brand-intro-wordmark" /><span className="brand-intro-title-scan" aria-hidden="true" /></div>
+        <p className="brand-intro-season">SEASON <strong>2026</strong> / CPC COMPETITIVE PROGRAMMING CHAMPIONSHIP</p>
+        <div className="brand-intro-mantra" aria-label="Code, compile, conquer"><span><small>01</small>CODE</span><i>//</i><span><small>02</small>COMPILE</span><i>//</i><span><small>03</small>CONQUER</span></div>
+      </div>
 
-        <div className="brand-intro-wordmark-wrap">
-          <RaceWordmark className="brand-intro-wordmark" />
-          <span className="brand-intro-logo-sweep" aria-hidden="true" />
-          <span className="brand-intro-season-badge">
-            SEASON <b>2026</b> // FIA FORMULA 1 SPEC
-          </span>
-        </div>
-
-        <div className="brand-intro-tagline">
-          <span className="tagline-token tagline-code">
-            <span className="tagline-num">01</span>
-            <strong>CODE.</strong>
-          </span>
-          <span className="tagline-slash" aria-hidden="true">//</span>
-          <span className="tagline-token tagline-compile">
-            <span className="tagline-num">02</span>
-            <strong>COMPILE.</strong>
-          </span>
-          <span className="tagline-slash" aria-hidden="true">//</span>
-          <span className="tagline-token tagline-conquer">
-            <span className="tagline-num">03</span>
-            <strong>CONQUER.</strong>
-          </span>
+      <div className="brand-intro-control">
+        <div className="brand-intro-control-label"><span><i /> RACE CONTROL</span><strong>{status}</strong></div>
+        <div className="brand-intro-progress" aria-hidden="true"><span /></div>
+        <div className="brand-intro-gantry" aria-label={lightsOut ? 'Starting lights are out' : `${lights} of 5 starting lights illuminated`}>
+          {[1, 2, 3, 4, 5].map(pod => <span key={pod} className={lights >= pod && !lightsOut ? 'is-lit' : ''} aria-hidden="true"><i /><i /></span>)}
         </div>
       </div>
 
-      <div className="brand-intro-readiness">
-        <div className="brand-intro-readiness-label">
-          <div className={`readiness-hud-left ${lightsOut ? 'is-ready' : ''}`}>
-            <span className="readiness-led-beacon" />
-            <span>RACE CONTROL</span>
-          </div>
-          <span className="readiness-hud-status">{statusText}</span>
-        </div>
-
-        <div className="brand-intro-progress-wrap">
-          <div
-            className="brand-intro-progress"
-            role="progressbar"
-            aria-label="Grid telemetry initialization"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={progress}
-          >
-            <span style={{ transform: `scaleX(${progress / 100})` }} />
-          </div>
-          <div className="progress-ticks" aria-hidden="true">
-            <i /><i /><i /><i /><i /><i /><i /><i /><i />
-          </div>
-        </div>
-
-        <div className={`brand-intro-gantry ${lightsOut ? 'is-lights-out' : ''}`} aria-hidden="true">
-          {[1, 2, 3, 4, 5].map((pod) => (
-            <div key={pod} className={`gantry-lamp-unit ${lights >= pod ? 'is-lit' : ''}`}>
-              <div className="gantry-lamp-inner" />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="brand-intro-wipe" aria-hidden="true"><i /><i /><i /></div>
-      <button
-        ref={skipButton}
-        className="brand-intro-skip"
-        type="button"
-        onClick={() => finish(true)}
-        aria-label="Skip introduction"
-      >
-        Skip intro <kbd>ESC</kbd>
-      </button>
-      <p className="sr-only" role="status">{statusText}</p>
+      <div className="brand-intro-launch" aria-hidden="true"><span /><span /><span /></div>
+      <button ref={skipButton} className="brand-intro-skip" type="button" onClick={() => finish(true)}>SKIP INTRO <kbd>ESC</kbd></button>
+      <p className="sr-only" role="status" aria-live="polite">{status}</p>
     </section>}
-    {children}
+    <div className="brand-intro-app" inert={visible ? true : undefined} aria-hidden={visible || undefined}>{children}</div>
   </>
 }
