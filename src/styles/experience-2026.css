@@ -51,7 +51,7 @@
   --cgp-shadow-panel: 0 22px 70px rgb(0 0 0 / 32%);
   --cgp-shadow-float: 0 14px 38px rgb(0 0 0 / 28%);
   --cgp-shadow-red: 0 16px 50px rgb(242 13 24 / 18%);
-  --cgp-focus: 0 0 0 3px rgb(255 189 74 / 32%);
+  --cgp-focus: 0 0 0 3px rgb(242 13 24 / 25%);
 
   /* Motion */
   --cgp-duration-fast: 120ms;
@@ -130,17 +130,35 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--cgp-amber);
-  outline-offset: 4px;
+  outline: 2px solid var(--cgp-red);
+  outline-offset: 3px;
   box-shadow: var(--cgp-focus);
 }
 
+input,
+select,
+textarea {
+  outline: none !important;
+}
+
+input:focus,
 input:focus-visible,
+select:focus,
 select:focus-visible,
+textarea:focus,
 textarea:focus-visible {
-  outline: 2px solid var(--cgp-amber);
-  outline-offset: 2px;
-  box-shadow: var(--cgp-focus);
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: #f5f5f5 !important;
+  transition: background-color 5000s ease-in-out 0s;
+  box-shadow: inset 0 0 20px 20px #08090a !important;
 }
 
 button,
@@ -1265,7 +1283,7 @@ textarea {
   bottom: 0;
   left: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--cgp-red), var(--cgp-amber));
+  background: linear-gradient(90deg, var(--cgp-red), var(--cgp-red-soft));
   content: '';
   transform: scaleX(0);
   transform-origin: left;
@@ -1284,7 +1302,7 @@ textarea {
   position: absolute;
   inset: 0 auto 0 -35%;
   width: 24%;
-  background: linear-gradient(90deg, transparent, rgb(255 189 74 / 12%), transparent);
+  background: linear-gradient(90deg, transparent, rgb(242 13 24 / 15%), transparent);
   content: '';
   transform: skewX(-20deg);
   animation: cgp-access-scan 1.15s .55s var(--cgp-ease-enter) both;
@@ -1535,7 +1553,7 @@ textarea {
 
 .admin-table-wrap:focus-visible,
 .volunteer-table-wrap:focus-visible,
-.standings-table-wrap:focus-visible { outline: 2px solid var(--cgp-amber); outline-offset: 3px; box-shadow: var(--cgp-focus); }
+.standings-table-wrap:focus-visible { outline: 2px solid var(--cgp-red); outline-offset: 3px; box-shadow: var(--cgp-focus); }
 
 .admin-table-wrap tbody tr,
 .volunteer-table-wrap tbody tr,

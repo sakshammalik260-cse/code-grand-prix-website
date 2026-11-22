@@ -309,7 +309,7 @@ html.brand-intro-active body {
 }
 
 .brand-intro-skip:hover { border-color: var(--cgp-red, #f20d18); background: #14171d; color: white; }
-.brand-intro-skip:focus-visible { opacity: 1; outline: 2px solid var(--cgp-amber, #ffbd4a); outline-offset: 3px; }
+.brand-intro-skip:focus-visible { opacity: 1; outline: 2px solid var(--cgp-red, #ff6269); outline-offset: 3px; }
 .brand-intro-skip kbd { padding: .18rem .3rem; border: 1px solid #3a404b; border-bottom-width: 2px; border-radius: 2px; color: var(--cgp-muted, #848c99); font: inherit; letter-spacing: .05em; }
 
 @keyframes brand-grid-in { from { opacity: 0; transform: scale(1.04); } to { opacity: .42; transform: scale(1); } }

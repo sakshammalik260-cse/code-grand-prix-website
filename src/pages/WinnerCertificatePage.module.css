@@ -124,7 +124,7 @@
 .organiser span { font-size: .55cqw; letter-spacing: .08em; }
 
 .editable { display: inline-block; padding: .12cqw .25cqw; border-radius: .08cqw; cursor: text; }
-.editable:hover { background: rgb(229 173 47 / 13%); outline: .1cqw dashed #9a6816; }
+.editable:hover { background: rgb(242 13 24 / 10%); outline: .1cqw dashed #f20d18; }
 .editable:focus { background: #fff9e8; outline: .16cqw solid #e52b20; }
 
 @media (max-width: 48rem) {

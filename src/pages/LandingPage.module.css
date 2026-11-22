@@ -808,7 +808,7 @@
 .rulesIntro > small { display: block; max-width: 20rem; margin-top: 1rem; color: var(--cgp-muted); font-size: .6875rem; line-height: 1.55; }
 .rulesList { position: relative; border-top: 1px solid var(--cgp-border); }
 .rulesList li { padding: 1.45rem 0; display: grid; grid-template-columns: 2.4rem minmax(0, 1fr); gap: 1rem; border-bottom: 1px solid var(--cgp-border); transition: background-color var(--cgp-duration-base) var(--cgp-ease-standard), transform var(--cgp-duration-base) var(--cgp-ease-standard); }
-.rulesList li:hover { background: linear-gradient(90deg, rgb(255 189 74 / 3.5%), transparent); transform: translateX(.3rem); }
+.rulesList li:hover { background: linear-gradient(90deg, rgb(242 13 24 / 4%), transparent); transform: translateX(.3rem); }
 .rulesList > li > span { color: var(--cgp-red-soft); font: 650 .6875rem/1.6 var(--cgp-font-technical); }
 .rulesList h3 { color: var(--cgp-white); font-size: .9375rem; }
 .rulesList p { margin-top: .45rem; color: var(--cgp-silver); font-size: .8125rem; line-height: 1.7; }
