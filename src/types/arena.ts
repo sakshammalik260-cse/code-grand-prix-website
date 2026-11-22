@@ -32,6 +32,7 @@ export interface ContestState {
   contestEndTime: string
   serverTime: string
   pausedAt?: string
+  resultsVisible?: boolean
   simulation: boolean
 }
 export type Verdict = 'ACCEPTED' | 'WRONG_ANSWER' | 'COMPILATION_ERROR' | 'RUNTIME_ERROR' | 'TIME_LIMIT_EXCEEDED' | 'MEMORY_LIMIT_EXCEEDED'
