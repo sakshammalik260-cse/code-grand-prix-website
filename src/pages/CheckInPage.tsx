@@ -19,6 +19,11 @@ export function CheckInPage() {
     return () => { if (video) video.srcObject = null }
   }, [camera.stream])
   useEffect(() => {
+    if (!camera.stream && !camera.pending) {
+      void camera.request()
+    }
+  }, [])
+  useEffect(() => {
     const update = () => setFullscreen(Boolean(document.fullscreenElement))
     document.addEventListener('fullscreenchange', update)
     return () => document.removeEventListener('fullscreenchange', update)
@@ -64,7 +69,7 @@ export function CheckInPage() {
             <span className={'camera-status-label ' + (camera.stream ? 'active' : '')}><span className="status-dot" />{camera.stream ? 'Camera Active' : 'Camera Offline'}</span>
           </div>
           <div className="inspection-device-controls">
-            <button className="button button-secondary" onClick={camera.request} disabled={camera.pending || !!camera.stream}>{camera.pending ? <LoaderCircle className="spin" size={15} /> : <Camera size={15} />}{camera.pending ? 'Requesting access…' : camera.stream ? 'Camera connected' : 'Enable camera'}</button>
+            <button className="button button-secondary" onClick={() => { void camera.request() }} disabled={camera.pending || !!camera.stream}>{camera.pending ? <LoaderCircle className="spin" size={15} /> : <Camera size={15} />}{camera.pending ? 'Requesting access…' : camera.stream ? 'Camera connected' : 'Enable camera'}</button>
             <button className="button button-secondary" onClick={enterFullscreen} disabled={fullscreen}>{fullscreen ? <><Check size={15} /> Fullscreen active</> : <><Expand size={15} /> Activate fullscreen</>}</button>
           </div>
           {camera.error && <p className="alert alert-error inspection-error" role="alert">{camera.error}</p>}

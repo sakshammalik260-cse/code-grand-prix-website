@@ -28,7 +28,12 @@ export const cameraStore = {
     pending = Promise.resolve().then(async () => {
       try {
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS or localhost and a supported browser.')
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+        let stream: MediaStream
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        }
         if (attempt !== generation) { stream.getTracks().forEach(track => track.stop()); return false }
         if (!stream.active || !stream.getVideoTracks().length) { stream.getTracks().forEach(track => track.stop()); throw new Error('No active camera video track was returned. Reconnect the camera and retry.') }
         cleanup(); snapshot.stream?.getTracks().forEach(track => track.stop())
@@ -57,7 +62,7 @@ export const cameraStore = {
         if (attempt !== generation) return false
         cleanup(); snapshot.stream?.getTracks().forEach(track => track.stop())
         const name = error instanceof DOMException ? error.name : ''
-        const message = name === 'NotAllowedError' ? 'Camera permission was denied. Allow camera access in site settings, then retry.' : name === 'NotFoundError' ? 'No camera found. Connect a camera and retry.' : name === 'NotReadableError' ? 'Camera may be in use by another app. Close it there and retry.' : error instanceof Error ? error.message : 'Unable to start the camera.'
+        const message = name === 'NotAllowedError' ? 'Camera permission was denied or blocked. Allow camera access in your browser settings (click the lock/permissions icon in your address bar), then retry.' : name === 'NotFoundError' ? 'No camera found. Connect a camera and retry.' : name === 'NotReadableError' ? 'Camera may be in use by another app. Close it there and retry.' : error instanceof Error ? error.message : 'Unable to start the camera.'
         publish({ stream: null, status: name === 'NotAllowedError' ? 'PERMISSION_REQUIRED' : 'UNAVAILABLE', error: message })
         return false
       } finally { if (attempt === generation) { pending = null; publish({ pending: false }) } }
