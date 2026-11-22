@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowDown, ArrowRight, ShieldCheck } from 'lucide-react'
 import { Countdown } from '../components/Countdown'
-import { CheckeredFlag, RaceWordmark } from '../components/RacingIdentity'
+import { RaceWordmark } from '../components/RacingIdentity'
 import { StatusIndicator } from '../components/Ui'
 import { event } from '../data/event'
 import heroArtwork from '../assets/artwork/night-race-hero.webp'
@@ -40,7 +40,6 @@ export function LandingPage() {
       <div className={styles.heroParticles} data-hero-layer="particles" aria-hidden="true">{ambientParticles.map(particle => <i key={particle} />)}</div>
       <div className={styles.velocityField} data-hero-layer="velocity" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
       <div className={styles.trackEnergy} data-hero-layer="track" aria-hidden="true"><span /><span /><span /></div>
-      <CheckeredFlag className={styles.heroFlag} />
       <div className={styles.heroFrame}>
         <div className={styles.heroIdentity} data-hero-layer="identity">
           <p className={styles.sessionTag}><span /> CHAMPIONSHIP 2026 <i /> ROUND 01</p>
