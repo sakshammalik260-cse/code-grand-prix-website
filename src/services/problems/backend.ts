@@ -3,7 +3,20 @@ import { api } from '../api'
 import type { AdminProblemService, CandidateProblemService } from '../../types/problems'
 import type { AdminProblem,AdminTestCase,ContestRound,AdminOverview } from '../../types/problems'
 export const backendAdminProblems:AdminProblemService={
-  async overview(signal){return(await api.get<AdminOverview>('/admin/overview',{signal})).data},
+  async overview(signal):Promise<AdminOverview>{
+    const raw = (await api.get<Record<string, unknown>>('/admin/overview',{signal})).data
+    const activeCount = Array.isArray(raw.activeRounds)
+      ? raw.activeRounds.length
+      : (typeof raw.activeRoundCount === 'number' ? raw.activeRoundCount : (typeof raw.activeRounds === 'number' ? raw.activeRounds : 0))
+    return {
+      totalQuestions: Number(raw.totalQuestions ?? raw.totalProblems ?? 0),
+      draftQuestions: Number(raw.draftQuestions ?? 0),
+      publishedQuestions: Number(raw.publishedQuestions ?? 0),
+      competitionStatus: String(raw.competitionStatus ?? raw.contestStatus ?? 'WAITING'),
+      participants: Number(raw.participants ?? raw.totalParticipants ?? 0),
+      activeRounds: activeCount,
+    }
+  },
   async list(signal){return(await api.get<AdminProblem[]>('/admin/problems',{signal})).data},
   async get(id,signal){return(await api.get<AdminProblem>(`/admin/problems/${encodeURIComponent(id)}`,{signal})).data},
   async create(input){return(await api.post<AdminProblem>('/admin/problems',questionPayload(input))).data},
