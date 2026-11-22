@@ -15,7 +15,7 @@ function resolveBaseUrl(): string {
 // Shared client for proposed endpoints. Arena requests use it only in explicit API mode.
 export const api = axios.create({
   baseURL: resolveBaseUrl(),
-  timeout: 15000,
+  timeout: 60000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 })
