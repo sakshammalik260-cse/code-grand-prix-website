@@ -15,12 +15,15 @@ import { BrandIntro } from './components/BrandIntro'
 import { RouteErrorBoundary } from './components/RouteErrorBoundary'
 import { RaceRouteTransition } from './components/RaceRouteTransition'
 
+const WinnerCertificatePage = lazy(() => import('./pages/WinnerCertificatePage').then(module => ({ default: module.WinnerCertificatePage })))
+
 const AdminPage = lazy(()=>import('./pages/admin/AdminPage'))
 const VolunteerPage = lazy(() => import('./pages/VolunteerPage'))
 const ArenaPage = lazy(() => import('./pages/ArenaPage'))
 
 export default function App() {
   return <BrandIntro><BrowserRouter><SessionProvider><CameraLifecycle /><RaceRouteTransition /><RouteErrorBoundary><Routes>
+    <Route path="certificate" element={<Suspense fallback={<LoadingState label="Preparing winner certificate" detail="Loading the print-ready championship artwork." />}><WinnerCertificatePage /></Suspense>} />
     <Route element={<Layout />}>
       <Route index element={<LandingPage />} />
       <Route path="login" element={<LoginPage />} />

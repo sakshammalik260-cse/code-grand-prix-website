@@ -895,7 +895,146 @@ textarea {
 .arena-focus-toggle.is-active { color: #fff; border-color: #b52a34; background: linear-gradient(110deg, #42151c, #21151a); }
 .arena-fullscreen-toggle > span { display: none; }
 
-.arena-driver-dropdown > button { display: flex; align-items: center; gap: 8px; }
+/* Driver profile menu styling in arena topbar */
+.arena-driver-menu {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.arena-driver-menu summary,
+.arena-driver-summary {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer;
+  list-style: none !important;
+  font-size: .75rem;
+  font-weight: 600;
+  font-family: var(--cgp-mono, Consolas, monospace);
+  color: #e4e7ee;
+  white-space: nowrap;
+  user-select: none;
+  padding: 4px 10px;
+  border-radius: var(--cgp-radius-sm, 6px);
+  border: 1px solid #333845;
+  background: #141720;
+  transition: all 0.15s ease;
+}
+
+.arena-driver-menu summary::-webkit-details-marker,
+.arena-driver-summary::-webkit-details-marker {
+  display: none !important;
+}
+
+.arena-driver-menu summary::marker,
+.arena-driver-summary::marker {
+  display: none !important;
+  content: "" !important;
+}
+
+.arena-driver-menu summary:hover,
+.arena-driver-summary:hover {
+  background: #1c202c;
+  border-color: #484f63;
+  color: #fff;
+}
+
+.arena-driver-menu summary:focus-visible,
+.arena-driver-summary:focus-visible {
+  outline: 2px solid var(--cgp-amber, #ffcc00);
+  outline-offset: 1px;
+}
+
+.arena-driver-menu .arena-user-avatar {
+  height: 24px;
+  width: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #232733;
+  border: 1px solid #4a5063;
+  border-radius: 50%;
+  color: #d1d5db;
+  flex-shrink: 0;
+}
+
+.arena-driver-chevron {
+  color: #8b92a3;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.arena-driver-menu[open] .arena-driver-chevron,
+.arena-driver-details[open] .arena-driver-chevron {
+  transform: rotate(180deg);
+  color: #fff;
+}
+
+.arena-driver-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 210px;
+  padding: 8px;
+  border: 1px solid #383d4c;
+  background: #13161e;
+  border-radius: 8px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.arena-driver-dropdown > strong {
+  display: block;
+  font-size: 12px;
+  color: #fff;
+  padding: 6px 10px 2px;
+}
+
+.arena-driver-dropdown > span {
+  display: block;
+  padding: 0 10px 10px;
+  border-bottom: 1px solid #282c38;
+  margin-bottom: 6px;
+  font-size: 10px;
+  color: #8e96a8;
+  font-family: var(--cgp-mono, Consolas, monospace);
+}
+
+.arena-driver-dropdown > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  border-radius: 4px;
+  color: #c7cbd6;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.arena-driver-dropdown > button:hover {
+  background: #222634;
+  color: #fff;
+}
+
+.arena-driver-dropdown > button:last-child {
+  color: #ff766d;
+  margin-top: 4px;
+  border-top: 1px solid #232733;
+  padding-top: 9px;
+}
+
+.arena-driver-dropdown > button:last-child:hover {
+  background: rgba(255, 90, 80, 0.12);
+  color: #ff9b94;
+}
 
 .arena-problem-navigation {
   position: relative;

@@ -40,6 +40,19 @@ export function ArenaHeader({ contest, clock, fullscreen, onFullscreen, onRefres
     {monitoring || <div className="arena-camera-chip"><Camera size={14} /><span>Camera status unavailable</span></div>}
     <button className={`arena-focus-toggle ${focusMode ? 'is-active' : ''}`} onClick={onFocusMode} aria-pressed={focusMode} title={`${focusMode ? 'Exit' : 'Enter'} focus mode (Ctrl/Cmd+Shift+F)`}><Focus size={14} /><span>{focusMode ? 'Exit focus' : 'Focus'}</span></button>
     <button className="arena-fullscreen-toggle" onClick={onFullscreen} aria-pressed={fullscreen} title={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>{fullscreen ? <Shrink size={14} /> : <Expand size={14} />}<span>FULLSCREEN</span></button>
-    <div className="arena-driver-menu"><details><summary><span className="arena-user-avatar"><UserRound size={14} /></span><span>{driver?.id || 'Driver'}</span><ChevronDown size={11} /></summary><div className="arena-driver-dropdown"><strong>{driver?.name || 'Driver'}</strong><span>{driver?.team || 'Code Grand Prix'}</span><button onClick={onFocusMode}><Focus size={13} />{focusMode ? 'Exit focus mode' : 'Enter focus mode'}</button><button onClick={onRefresh} disabled={refreshing}><RefreshCw size={13} className={refreshing ? 'spin' : ''} />Refresh race status</button><button onClick={signOut}><LogOut size={13} />Sign out</button></div></details></div>
+    <details className="arena-driver-menu">
+      <summary className="arena-driver-summary">
+        <span className="arena-user-avatar"><UserRound size={14} /></span>
+        <span className="arena-driver-name">{driver?.id || 'Driver'}</span>
+        <ChevronDown size={12} className="arena-driver-chevron" />
+      </summary>
+      <div className="arena-driver-dropdown">
+        <strong>{driver?.name || 'Driver'}</strong>
+        <span>{driver?.team || 'Code Grand Prix'}</span>
+        <button onClick={onFocusMode}><Focus size={13} />{focusMode ? 'Exit focus mode' : 'Enter focus mode'}</button>
+        <button onClick={onRefresh} disabled={refreshing}><RefreshCw size={13} className={refreshing ? 'spin' : ''} />Refresh race status</button>
+        <button onClick={signOut}><LogOut size={13} />Sign out</button>
+      </div>
+    </details>
   </header>
 }
