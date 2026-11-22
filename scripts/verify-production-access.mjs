@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict'
+import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import {browserQa} from './browser-qa.mjs'
 const offline=process.argv.includes('--offline')
@@ -14,8 +14,8 @@ qa.socket.addEventListener('message',({data})=>{
  const {requestId,request}=message.params,path=new URL(request.url).pathname
  let code=200,body={}
  if(path==='/api/auth/me'){code=role?200:401;body=role?{id:'SERVER-ACCOUNT',name:'Server account',team:'CPC',role}:{message:'Not authenticated'}}
- else if(path==='/api/session')body={viewer:{id:'SERVER-ACCOUNT',role,simulation:false},session:null,serverTime:new Date().toISOString()}
- else if(path==='/api/admin/overview')body={totalQuestions:0,draftQuestions:0,publishedQuestions:0,competitionStatus:'WAITING',participants:0,activeRounds:0}
+ else if(path==='/api/session')body={viewer:{id:'SERVER-ACCOUNT',role,simulation:false},session:{driverId:'SERVER-ACCOUNT'},checkinStatus:'NOT_STARTED',serverTime:new Date().toISOString()}
+ else if(path==='/api/admin/overview')body={totalQuestions:0,draftQuestions:0,publishedQuestions:0,competitionStatus:'WAITING',participants:0,activeRounds:[],activeRoundCount:0}
  else if(['/api/admin/problems','/api/admin/rounds','/api/volunteer/incidents','/api/volunteer/participants'].includes(path))body=[]
  else {code=403;body={message:'No fixture for this request'}}
  void send('Fetch.fulfillRequest',{requestId,responseCode:code,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify(body)).toString('base64')})

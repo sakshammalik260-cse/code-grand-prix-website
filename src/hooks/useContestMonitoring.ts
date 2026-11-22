@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { MonitoringClient } from '../services/monitoring/client'
 import { cameraStore } from '../services/cameraStore'
-import { sessionAllowsExecution } from '../services/monitoring/sessionRules'
+import { canReportIncident, sessionAllowsExecution } from '../services/monitoring/sessionRules'
 import type { ParticipantScope } from '../types/monitoring'
 
 export function useContestMonitoring(scope: ParticipantScope & { enabled: boolean; problemId: string }) {
   const [client] = useState(() => new MonitoringClient(scope))
   const state = useSyncExternalStore(client.subscribe,client.getSnapshot)
+  const [visible,setVisible] = useState(document.visibilityState === 'visible')
   const camera = useSyncExternalStore(cameraStore.subscribe,cameraStore.getSnapshot)
   useEffect(() => { client.start(); return () => client.stop() },[client])
   useEffect(() => { client.setProblem(scope.problemId) },[client,scope.problemId])
@@ -21,7 +22,20 @@ export function useContestMonitoring(scope: ParticipantScope & { enabled: boolea
     let cameraRevision = cameraStore.getSnapshot().interruptionRevision
     let focusTimer: ReturnType<typeof setTimeout> | undefined
     const inArena = () => !leaving && window.location.pathname.toLowerCase().replace(/\/+$/, '') === '/arena'
-    const arm = () => { if (inArena() && document.visibilityState === 'visible' && client.getSnapshot().session && cameraStore.getSnapshot().status === 'ACTIVE' && document.fullscreenElement) armed = true }
+    const arm = () => {
+      const snapshot = client.getSnapshot()
+      if (!inArena() || !canReportIncident(snapshot)) {
+        armed = false; client.setMonitoringArmed(false)
+        clearTimeout(tabTimer); tabTimer = undefined; clearTimeout(focusTimer)
+        return
+      }
+      // Re-baseline only after confirmed approval, queue synchronization and explicit setup recovery.
+      if (!armed && !snapshot.pending.length && document.visibilityState === 'visible' && cameraStore.getSnapshot().status === 'ACTIVE' && document.fullscreenElement) {
+        hidden = false; lostFocus = false; fullscreen = true
+        cameraRevision = cameraStore.getSnapshot().interruptionRevision
+        armed = true; client.setMonitoringArmed(true)
+      }
+    }
     arm()
     const checkCamera = () => {
       const current = cameraStore.getSnapshot()
@@ -38,6 +52,7 @@ export function useContestMonitoring(scope: ParticipantScope & { enabled: boolea
         if (armed && inArena() && !client.permissionSuppressed() && !tabTimer) tabTimer = setTimeout(() => { tabTimer = undefined; if (armed && inArena() && !client.permissionSuppressed()) client.report('TAB_HIDDEN') },100)
       }
       hidden = nowHidden
+      setVisible(!nowHidden)
       if (!hidden) { lostFocus = false; arm(); void client.refresh() }
     }
     const blur = () => {
@@ -64,6 +79,7 @@ export function useContestMonitoring(scope: ParticipantScope & { enabled: boolea
     const online = () => { void client.refresh() }
     window.addEventListener('online',online); window.addEventListener('offline',online)
     return () => {
+      client.setMonitoringArmed(false)
       clearTimeout(tabTimer); clearTimeout(focusTimer); window.removeEventListener('pageshow',pageRestored); window.removeEventListener('beforeunload',pageLeaving); window.removeEventListener('pagehide',pageLeaving); unsubscribeCamera(); unsubscribeSession()
       document.removeEventListener('visibilitychange',visibility); document.removeEventListener('fullscreenchange',fullscreenChange)
       window.removeEventListener('blur',blur); window.removeEventListener('focus',focus); window.removeEventListener('online',online); window.removeEventListener('offline',online)
@@ -71,8 +87,8 @@ export function useContestMonitoring(scope: ParticipantScope & { enabled: boolea
   },[client,scope.enabled])
   const pendingLock = state.pending.some(item => item.type !== 'WINDOW_FOCUS_LOST')
   const locked = pendingLock || !!state.session && ['LOCK_PENDING','LOCKED','UNDER_REVIEW'].includes(state.session.status)
-  const ready = camera.status === 'ACTIVE' && !!document.fullscreenElement
-  const authorized = state.connection === 'CONNECTED' && !pendingLock && sessionAllowsExecution(state.session)
+  const ready = visible && camera.status === 'ACTIVE' && !!document.fullscreenElement
+  const authorized = state.connection === 'CONNECTED' && state.pending.length === 0 && sessionAllowsExecution(state.session)
   return { ...state, client, camera, locked, ready, authorized,
     recoverCamera: useCallback(() => client.permissionAction(cameraStore.request),[client]),
   }

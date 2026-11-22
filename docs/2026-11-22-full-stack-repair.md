@@ -1,0 +1,56 @@
+# Code Grand Prix 2026 full-stack repair
+
+**November 23 event decision: NO-GO.** The local application and PostgreSQL regressions passed. Live judging, sandbox isolation, and event capacity require an approved environment and rehearsal before opening the contest.
+
+## Already available in the local branches
+
+- Check-in already checked the browser camera, fullscreen, and rules acceptance, then called `POST /api/checkin` before opening the lobby. Candidate session restoration already called `GET /api/auth/me` and `GET /api/session`. Admin and volunteer routes already had role gates.
+- The backend already provided the numeric `activeRoundCount` and detailed `activeRounds` array. The frontend already displayed the number. The adapter replaced the array with the count and relied on a compile-time type for the response.
+- Admin question, public and hidden case, hint, and round endpoints were already implemented. Candidate question DTOs already excluded hidden cases and locked hint content. Existing scoring and hint receipts already prevented duplicate awards and duplicate deductions.
+- Judge0, Judge0 through RapidAPI, and Piston adapters already existed locally. Run and Submit selected the configured provider. The adapters already translated infrastructure failures into execution unavailability.
+
+## Confirmed issues and repairs
+
+| Area | Result |
+| --- | --- |
+| Check-in and session | The frontend validates that a successful receipt belongs to the signed-in driver. Refresh restores the server's check-in before opening protected candidate pages. Candidate session expiry returns the user to login. Staff check-ins are denied, and a concurrent lock returns a volunteer-review error. The arena keeps a locked session available for authorized recovery and displays camera errors when setup prevents execution. |
+| Admin overview | The frontend validates the count, round records, and contest state at runtime. It retains the detailed array and displays `activeRoundCount`. Admin Results now links to official standings. |
+| Shared-IP login | Replaced the 15-request IP cap with driver-and-source, driver across sources, and source-wide budgets. Successful logins release their reservations. HMAC bucket keys use the normalized identity and the trusted source where applicable. Existing and unknown driver IDs get the same credential error and equivalent bcrypt work. PostgreSQL shares rate limits across production instances. |
+| Standings | `GET /api/leaderboard` authenticates every viewer. Admins can inspect official standings while withheld. Candidates and volunteers get released standings. While withheld, volunteer session review remains available and its participant feed omits scores. Cross-driver submission details follow the same visibility rule for volunteers. A candidate retains access to their own progress and submissions. Final standings keep the contest's released problem count after a round ends. |
+| Cookie and deployment | Login returns account data and sets a JWT in an HttpOnly cookie. Browser origins are checked before API handling. Production requires HTTPS through explicitly trusted proxies, secure cookies, PostgreSQL, and a configured remote judge. Frontend builds expose only the three supported public Vite settings. |
+| Homepage | Fixed the reduced-motion rules that lost to the hero selector. The standard animation and its visual layout passed the existing homepage regressions. |
+
+## API contracts and compatibility
+
+- `POST /api/auth/login` sets `auth_token` and returns the profile and existing contest metadata. Postman and the HTTP test clients use cookies. Existing bearer tokens remain accepted until expiry or revocation. A client that used the removed JSON `token` field must use a cookie jar for new logins. JWT lifetime and cookie lifetime both use `JWT_EXPIRES_IN`.
+- `POST /api/checkin` accepts boolean `rulesAccepted`, `cameraPermission`, and `fullscreenRequested` fields. The frontend checks `checkinStatus === 'READY'` and the receipt's public `session.driverId` before opening the lobby. `GET /api/session` returns authoritative check-in and lock state plus the volunteer authorization receipt when applicable.
+- `GET /api/admin/overview` provides `activeRoundCount: number` and `activeRounds: ContestRound[]`. The candidate results visibility endpoint returns a boolean. Withheld leaderboard responses for candidates and volunteers contain an empty `rows` array. The admin leaderboard response includes official rows.
+- Login throttling uses a 15-minute window. It allows eight failed or in-flight attempts per driver and source, 20 per driver across sources, and a configurable source budget of 250 by default. It returns HTTP 429 with `Retry-After`. IPv6 source buckets use a /64.
+- Run and Submit return HTTP 503 when the selected judge is unavailable. The backend does not award points for infrastructure failures. Hidden cases stay out of candidate responses. An isolated judge receives hidden standard input when running a submission. Expected outputs remain in the backend.
+
+## Verification
+
+| Evidence | Result |
+| --- | --- |
+| Local builds and static checks | Frontend `npm.cmd run build` and `npm.cmd run lint`, backend `npm.cmd run build`, and Git whitespace checks passed. Frontend draft, monitoring, question and assist scripts passed. |
+| Real PostgreSQL and HTTP | All nine backend suites passed in disposable schemas. Authentication and standings passed 164 HTTP checks, including 36 successful candidates from one source, throttling across two HTTP listeners, source limits, expiry and revocation, role spoofing defenses, origin restrictions, and role-dependent results access. Phase 3 passed 22 checks, Phase 4 passed 11, Phase 5 passed 16, remediation passed 72 assertions, and admin and rounds passed 94 HTTP checks. |
+| Admin and recovery on PostgreSQL | The HTTP suites covered drafts, editing, public and hidden cases, hints, assignment, publish and unpublish, round changes, participant lists, incident review, authorized recovery, role isolation, hidden test protection, and idempotent deductions. The trusted local adapter ran repository-owned fixture programs in test mode. |
+| Chrome and real Express/PostgreSQL | Three isolated Chrome profiles passed candidate, admin, and volunteer login. The browser verified server-backed check-in, lobby and locked arena restoration, draft retention, Run and Submit HTTP 503, reconnection, volunteer recovery, question creation and publication, hints, round transitions, withheld standings with admin access, logout, and mobile layout. Chrome used a synthetic camera video file after its default fake camera disconnected. |
+| Chrome with fixtures | Homepage animation, reduced motion, scrolling, route guards, and mock monitoring checks passed. Production preview checks used mocked API responses for configured mode. The unconfigured preview sent zero API requests. A production build excluded an unrelated Vite environment canary and rejected an HTTP API URL. |
+| Mock judge protocols and real PostgreSQL | Native Judge0 passed 24 HTTP checks, RapidAPI passed 38, and Piston passed 39. The tests covered adapter responses, stored scores, and failure handling against local protocol mocks. |
+| Production configuration | Startup validation accepted a valid fixture configuration and rejected nine invalid variants. The HTTP checks verified approved origins and forwarded HTTPS through a configured trusted test proxy address. The deployed HTTPS edge remains to be verified. |
+
+## Files changed by this repair
+
+**Frontend.** `.env.example`, `vite.config.ts`, `src/context/SessionProvider.tsx`, `src/pages/ArenaPage.tsx`, `src/pages/admin/AdminSections.tsx`, `src/services/api.ts`, `src/services/arena/backend.ts`, `src/services/checkIn.ts`, `src/services/mode.ts`, `src/services/problems/backend.ts`, `src/services/problems/contracts.ts`, `src/services/problems/mock.ts`, `src/styles/home-experience.css`, `src/types/problems.ts`, `scripts/verify-backend-browser.mjs`, `scripts/verify-production-access.mjs`, `scripts/verify-questions.mjs`, and this report.
+
+**Backend.** `.env.example`, `README.md`, `docs/code-grand-prix-postman.json`, `docs/judge0-integration.md`, `docs/piston-integration.md`, `prisma/schema.prisma`, `prisma/migrations/20261121130000_login_rate_buckets/migration.sql`, `src/app.ts`, `src/server.ts`, `src/config/database.ts`, `src/config/env.ts`, `src/controllers/auth.controller.ts`, `src/controllers/leaderboard.controller.ts`, `src/controllers/volunteer.controller.ts`, `src/judge/judge.service.ts`, `src/middleware/auth.middleware.ts`, `src/repositories/problem.repository.ts`, `src/repositories/session.repository.ts`, `src/repositories/token.repository.ts`, `src/repositories/user.repository.ts`, `src/routes/auth.routes.ts`, `src/routes/checkin.routes.ts`, `src/routes/leaderboard.routes.ts`, `src/services/auth.service.ts`, `src/services/checkin.service.ts`, `src/services/leaderboard.service.ts`, `src/services/login-rate-limit.ts`, and `src/services/volunteer.service.ts`. Test changes are in `tests/admin-rounds.test.ts`, `tests/auth-and-standings.test.ts`, `tests/browser-server.ts`, `tests/http-auth.ts`, `tests/judge-http.ts`, `tests/phase3.test.ts`, `tests/phase4.test.ts`, `tests/phase5.test.ts`, `tests/remediation.test.ts`, and `tests/run-all.ts`.
+
+Both branches and both Git indexes were preserved. Recoverable working copies were saved outside the repositories without copying the live environment file. The clean original `src/server.ts` was recovered from Git for the backup. The incomplete installed backend dependencies were preserved in the backup directory and restored from the existing lockfile. Prisma generation used the pinned version. Test migrations and fixture writes used disposable schemas. The browser test servers and its disposable schema were cleaned up.
+
+## Remaining gates and deployment requirements
+
+- Live Judge0 and Piston endpoints were unavailable locally. RapidAPI and live verdicts were outside the approved test scope. No privileged containers were started. Physical lab cameras, production TLS and proxy behavior, and sustained peak traffic still need a rehearsal.
+- Apply the reviewed login bucket migration to the approved PostgreSQL environment before starting the API. All replicas should use the same database schema and signing configuration. Production refuses to start without its expected rate-limit table.
+- Build with `VITE_ARENA_MODE=api` and serve `/api` through the same HTTPS origin where possible. Set the exact HTTPS `ALLOWED_ORIGINS` and `API_BASE_URL`, `COOKIE_SECURE=true`, and separate strong cookie and JWT secrets. Restrict access to Express and set `TRUST_PROXY` to the deployed proxy addresses. Configure the edge to overwrite forwarded IP and protocol headers. [Express proxy guidance](https://expressjs.com/en/guide/behind-proxies/) ? [Vite environment guidance](https://vite.dev/guide/env-and-mode.html)
+- Approve and provision a separately isolated judge. Rehearse all advertised languages, sandbox network and filesystem restrictions, resource limits, and realistic concurrent Run and Submit bursts. Validate queue depth, error rates, and timing before opening the round.

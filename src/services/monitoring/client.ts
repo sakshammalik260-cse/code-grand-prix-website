@@ -1,6 +1,6 @@
 import type { CompetitionSession, IncidentRequest, IncidentType, MonitoringSnapshot, ParticipantScope } from '../../types/monitoring'
 import { monitoringService, monitoringPollMs } from './index'
-import { canAcceptSession, isSessionSnapshot } from './sessionRules'
+import { canAcceptSession, canReportIncident, isSessionSnapshot } from './sessionRules'
 
 export class MonitoringClient {
   private value: MonitoringSnapshot
@@ -14,6 +14,8 @@ export class MonitoringClient {
   private problemId: string | null = null
   private journalKey: string
   private lockKey: string
+  private monitoringArmed = false
+  setMonitoringArmed(armed: boolean) { this.monitoringArmed = armed }
   private permissionDepth = 0
   private permissionUntil = 0
   constructor(privateScope: ParticipantScope) {
@@ -50,7 +52,7 @@ export class MonitoringClient {
     void this.refresh()
     this.interval = setInterval(() => { void this.refresh() },monitoringPollMs)
   }
-  stop() { this.lifecycle++; this.running = false; this.refreshing = false; this.flushing = false; this.abort.abort(); clearInterval(this.interval); this.persist() }
+  stop() { this.lifecycle++; this.running = false; this.monitoringArmed = false; this.refreshing = false; this.flushing = false; this.abort.abort(); clearInterval(this.interval); this.persist() }
   private failure(error: unknown) {
     if (!this.running || this.abort.signal.aborted) return
     const status = (error as { response?: { status?: number }; code?: string })?.response?.status
@@ -72,7 +74,7 @@ export class MonitoringClient {
     finally { if (generation === this.lifecycle) this.refreshing = false }
   }
   report(type: IncidentType, clientEventId = crypto.randomUUID()) {
-    if (!this.running || !this.value.session || this.value.session.status === 'FINISHED' || this.value.pending.some(item => item.clientEventId === clientEventId)) return
+    if (!this.running || !this.monitoringArmed || !canReportIncident(this.value) || !this.value.session || this.value.pending.some(item => item.clientEventId === clientEventId)) return
     const request: IncidentRequest = { ...this.scope, sessionId: this.value.session.id, clientEventId, type, observedAt: new Date().toISOString(), problemId: this.problemId }
     this.publish({ pending: [...this.value.pending,request] }); this.persist()
     void this.flush()

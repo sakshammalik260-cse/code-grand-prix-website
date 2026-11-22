@@ -13,3 +13,19 @@
 @media(min-width:701px) and (max-width:1200px){.arena-brand{width:200px}}
 
 @media(max-width:1200px){.arena-status-bar .arena-keyboard-hints{display:none}}
+
+@media (max-width: 410px) {
+  .arena-editor-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+  }
+
+  .arena-editor-actions .arena-action-spacer {
+    display: none;
+  }
+
+  .arena-editor-actions .arena-input-selector {
+    justify-self: end;
+  }
+}

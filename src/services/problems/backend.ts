@@ -1,9 +1,11 @@
-import { questionPayload,parseProblemSummary,parsePublicProblem } from './contracts'
+import { parseAdminOverview, questionPayload,parseProblemSummary,parsePublicProblem } from './contracts'
 import { api } from '../api'
 import type { AdminProblemService, CandidateProblemService } from '../../types/problems'
-import type { AdminProblem,AdminTestCase,ContestRound,AdminOverview } from '../../types/problems'
+import type { AdminProblem,AdminTestCase,ContestRound } from '../../types/problems'
 export const backendAdminProblems:AdminProblemService={
-  async overview(signal){return(await api.get<AdminOverview>('/admin/overview',{signal})).data},
+  async overview(signal) {
+    return parseAdminOverview((await api.get<unknown>('/admin/overview', { signal })).data)
+  },
   async list(signal){return(await api.get<AdminProblem[]>('/admin/problems',{signal})).data},
   async get(id,signal){return(await api.get<AdminProblem>(`/admin/problems/${encodeURIComponent(id)}`,{signal})).data},
   async create(input){return(await api.post<AdminProblem>('/admin/problems',questionPayload(input))).data},
@@ -16,6 +18,8 @@ export const backendAdminProblems:AdminProblemService={
   async addCase(id,input){return(await api.post<AdminTestCase>(`/admin/problems/${encodeURIComponent(id)}/testcases`,input)).data},
   async updateCase(id,input){return(await api.patch<AdminTestCase>(`/admin/testcases/${encodeURIComponent(id)}`,input)).data},
   async deleteCase(id){await api.delete(`/admin/testcases/${encodeURIComponent(id)}`)},
+  async getLeaderboardVisibility(signal) { return (await api.get<{ visible: boolean }>('/admin/results/visibility', { signal })).data },
+  async setLeaderboardVisibility(visible) { return (await api.post<{ visible: boolean }>('/admin/results/visibility', { visible })).data },
   async rounds(signal){return(await api.get<ContestRound[]>('/admin/rounds',{signal})).data},
   async saveRound(input){return(await api.put<ContestRound>(`/admin/rounds/${encodeURIComponent(input.id)}`,input)).data},
 }

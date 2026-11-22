@@ -1,6 +1,7 @@
 ﻿import type { Driver, LoginCredentials } from '../types'
 export const developmentAccounts = [
   { id:'CGP2026', password:'Race2026!', role:'CANDIDATE', name:'Demo Driver', team:'CPC / Preview grid' },
+  { id:'CGP047', password:'Race@047', role:'CANDIDATE', name:'Demo Driver 047', team:'CPC / Preview grid' },
   { id:'VOLUNTEER2026', password:'Marshal2026!', role:'VOLUNTEER', name:'Demo Marshal', team:'CPC / Race control' },
   { id:'ADMIN2026', password:'Control2026!', role:'ADMIN', name:'Demo Organizer', team:'CPC / Administration' },
 ] as const

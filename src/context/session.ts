@@ -5,7 +5,7 @@ export interface SessionContextValue {
   authError: string
   driver: Driver | null
   checkIn: CheckInRecord | null
-  signIn: (driver: Driver) => void
+  signIn: (driver: Driver) => Promise<CheckInRecord | null>
   signOut: () => void
   completeCheckIn: (record: CheckInRecord) => void
 }

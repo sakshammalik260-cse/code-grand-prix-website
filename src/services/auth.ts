@@ -16,5 +16,7 @@ export const authService = {
     try { return validateIdentity((await api.get<Driver>('/auth/me',{signal})).data) }
     catch (error) { if ((error as { response?: { status: number } }).response?.status === 401) return null; throw error }
   },
-  async logout() { if (!isDevelopmentMock) await api.post('/auth/logout'); else if(mock) (await mock()).mockLogout() },
+  async logout() { if (isDevelopmentMock && mock) { (await mock()).mockLogout(); return }
+    try { await api.post('/auth/logout') }
+    catch (error) { if ((error as { response?: { status: number } }).response?.status !== 401) throw error } },
 }

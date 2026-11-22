@@ -12,6 +12,7 @@ export function validateProblem(input:ProblemInput):string[] {
   if(!Number.isInteger(input.timeLimitMs)||input.timeLimitMs<100||input.timeLimitMs>60000)errors.push('Time limit must be an integer from 100 to 60,000 ms.')
   if(!Number.isInteger(input.memoryLimitMb)||input.memoryLimitMb<16||input.memoryLimitMb>4096)errors.push('Memory limit must be an integer from 16 to 4,096 MB.')
   if(!input.samples.length || input.samples.some(sample=>!sample.input.trim()||!sample.output.trim()))errors.push('Add at least one complete public sample input and output.')
+  if(input.order!==undefined&&(!Number.isInteger(input.order)||input.order<1||input.order>10000))errors.push('Question order must be an integer from 1 to 10,000.')
   errors.push(...validateHints(input.hints||[]))
   return errors
 }

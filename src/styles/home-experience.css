@@ -1,0 +1,157 @@
+/* Homepage interactions share the existing header, typography, and section geometry. */
+.home-shell .navigation > a {
+  position: relative;
+  white-space: nowrap;
+}
+.home-nav-number {
+  position: absolute;
+  left: -1.7em;
+  color: #afb3bf;
+  font: 9px/1 Consolas, monospace;
+}
+.home-nav-number::before { content: attr(data-number); }
+.home-shell .navigation > a::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 23px;
+  height: 1px;
+  background: #ff514b;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 180ms ease;
+}
+.home-shell .navigation > a:is(:hover, :focus-visible, [aria-current])::after { transform: scaleX(1); }
+.home-shell .navigation > a[aria-current] .home-nav-number { color: #ff7973; }
+.home-shell :is(.navigation a, .nav-cta, .racing-button, summary, .race-intro-actions a, .race-intro-actions button):focus-visible {
+  outline: 2px solid #ff7973;
+  outline-offset: 4px;
+}
+.home-shell .nav-cta { transition: border-color 160ms ease, background-color 160ms ease; }
+.home-shell .nav-cta:hover { background-color: #242127; }
+.home-motion-preference { position: relative; }
+.home-motion-preference summary {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  min-height: 34px;
+  cursor: pointer;
+  color: #dfdfe6;
+  list-style: none;
+}
+.home-motion-preference summary::-webkit-details-marker { display: none; }
+.home-motion-options {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: max-content;
+  max-width: 75vw;
+  padding: 12px 14px;
+  border: 1px solid #58525d;
+  border-radius: 5px;
+  background: #111116;
+  color: #f5f5f5;
+  font-size: 13px;
+  box-shadow: 0 8px 24px #0009;
+}
+.home-motion-options label { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+.home-motion-options input { accent-color: #e10600; }
+
+.home-shell .home-revealed { animation: home-section-reveal 480ms cubic-bezier(.2,.7,.25,1) backwards; }
+.home-shell [data-home-reveal="hero"].home-revealed { animation-name: home-hero-reveal; }
+.home-shell .cpc-pillar:nth-child(2) { animation-delay: 60ms; }
+.home-shell .cpc-pillar:nth-child(3) { animation-delay: 120ms; }
+@keyframes home-section-reveal {
+  from { opacity: .4; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes home-hero-reveal {
+  from { opacity: .45; clip-path: inset(0 0 18% 0); }
+  to { opacity: 1; clip-path: inset(0 0 0 0); }
+}
+
+.race-intro[open] {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 0;
+  color: #f5f5f5;
+  background: radial-gradient(ellipse at center, #210e13, #060609 66%);
+  animation: race-intro-exit 420ms ease 1.25s both;
+}
+.race-intro::backdrop { background: transparent; }
+.race-intro .race-intro-wordmark { font-size: clamp(40px, 8vw, 90px); }
+.race-intro-wordmark .race-speed-mark { animation: race-intro-stripes 480ms ease-out both; }
+.race-intro-wordmark :is(.wordmark-code, .wordmark-grand) { animation: race-intro-title 460ms ease-out 220ms both; }
+.race-intro-light {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(113deg, transparent 40%, #e1060028 50%, transparent 60%);
+  animation: race-intro-light 660ms ease-in-out 600ms both;
+}
+.race-intro-actions {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  inset-inline: 16px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.race-intro-actions :is(button, a) {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border: 1px solid #65535a;
+  border-radius: 4px;
+  background: #100d12;
+  color: inherit;
+  font-size: 12px;
+}
+.race-intro-actions :is(button, a):hover { border-color: #ff514b; }
+.race-intro-actions kbd { color: #c9bdc4; font-size: 10px; }
+@keyframes race-intro-stripes {
+  from { clip-path: inset(0 100% 0 0); transform: translateX(-38%); opacity: 0; }
+  to { clip-path: inset(0); transform: none; opacity: 1; }
+}
+@keyframes race-intro-title {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes race-intro-light {
+  0% { transform: translateX(-40%); opacity: 0; }
+  50% { opacity: .8; }
+  100% { transform: translateX(40%); opacity: 0; }
+}
+@keyframes race-intro-exit { from { opacity: 1; } to { opacity: 0; } }
+.home-motion-paused .home-revealed,
+.home-shell:has(.race-intro[open]) [data-home-reveal="hero"],
+.race-intro[data-paused="true"],
+.race-intro[data-paused="true"] * { animation-play-state: paused; }
+
+@media (max-width: 700px) {
+  .home-shell .navigation.open > a { gap: 10px; }
+  .home-nav-number { position: static; }
+  .home-shell .navigation.open > a::after { inset: auto 14px 8px; }
+}
+.home-shell.home-motion-reduced .home-revealed { animation: none; }
+.home-motion-reduced .living-race-background { display: none; }
+.home-motion-reduced .living-race-background g { animation: none; }
+.home-motion-reduced :is(.cpc-pillar, .cpc-pillar-line, .nav-cta, .racing-button),
+.home-motion-reduced .navigation > a::after { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .home-shell .home-revealed,
+  .home-shell [data-home-reveal="hero"].home-revealed { animation: none; }
+  .home-shell :is(.nav-cta, .racing-button),
+  .home-shell .navigation > a::after { transition: none; }
+}

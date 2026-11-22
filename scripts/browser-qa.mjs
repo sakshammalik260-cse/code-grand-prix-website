@@ -1,11 +1,11 @@
-﻿import fs from 'node:fs/promises'
+import fs from 'node:fs/promises'
 import assert from 'node:assert/strict'
 
 // Isolated Chrome only: set CGP_QA_CDP_URL to the browser's local debugging address.
-export async function browserQa() {
+export async function browserQa(targetId) {
   const address=process.env.CGP_QA_CDP_URL||'http://127.0.0.1:9225'
   const targets=await(await fetch(address+'/json')).json()
-  const page=targets.find(target=>target.type==='page')
+  const page=targets.find(target=>target.type==='page' && (!targetId || target.id===targetId))
   assert.ok(page,'Start an isolated Chrome test browser with remote debugging enabled.')
   const socket=new WebSocket(page.webSocketDebuggerUrl)
   await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}))

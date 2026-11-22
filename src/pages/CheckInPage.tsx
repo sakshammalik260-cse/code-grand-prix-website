@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Camera, CameraOff, Check, Circle, Expand, LoaderCircle, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react'
 import { useCamera } from '../hooks/useCamera'
 import { useSession } from '../hooks/useSession'
+import { verifyCheckIn } from '../services/checkIn'
 import { CheckeredFlag } from '../components/RacingIdentity'
 
 export function CheckInPage() {
@@ -12,6 +13,8 @@ export function CheckInPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [fullscreen, setFullscreen] = useState(Boolean(document.fullscreenElement))
   const [fullscreenError, setFullscreenError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [accepted, setAccepted] = useState(false)
   useEffect(() => {
     const video = videoRef.current
@@ -32,10 +35,19 @@ export function CheckInPage() {
   }
   const checks = [{ title: 'Driver identity confirmed', done: !!driver }, { title: 'Camera preview connected', done: !!camera.stream?.active }, { title: 'Fullscreen activated', done: fullscreen }, { title: 'Rules acknowledged', done: accepted }]
   const ready = checks.every(check => check.done)
-  function start() {
-    if (!ready || !driver || !document.fullscreenElement || !camera.stream?.active) return
-    completeCheckIn({ driverId: driver.id, completedAt: new Date().toISOString(), cameraVerified: true, rulesAccepted: true, fullscreenVerified: true })
-    navigate('/lobby')
+  async function start() {
+    if (saving || !ready || !driver || !document.fullscreenElement || !camera.stream?.active) return
+    setSaving(true)
+    setSaveError('')
+    try {
+      const receipt = await verifyCheckIn({ driverId: driver.id, completedAt: new Date().toISOString(), cameraVerified: true, rulesAccepted: accepted, fullscreenVerified: true })
+      completeCheckIn(receipt)
+      navigate('/lobby')
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Unable to verify check-in. Try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const inspectionSteps = [
@@ -74,7 +86,8 @@ export function CheckInPage() {
         </div>
         <aside className="inspection-status-column readiness-panel">
           <section className="glass-panel system-status-panel" aria-label="System status"><h2>System Status</h2><ul>{inspectionSteps.map(step => <li key={step.status} className={step.done ? 'verified' : ''}>{step.done ? <Check className="status-verified-icon" size={16} strokeWidth={3} /> : <Circle size={16} />}<span>{step.status}</span><span className="sr-only">{step.done ? ', complete' : ', pending'}</span></li>)}</ul><div className="system-check-count">{checks.filter(check => check.done).length} OF 4 CHECKS COMPLETE <span>{ready ? 'READY' : 'PENDING'}</span></div></section>
-          <button id="start-engine" className="button button-primary racing-button w-full" disabled={!ready} onClick={start}><span>START YOUR ENGINE <ArrowRight size={18} /></span></button>
+          <button id="start-engine" className="button button-primary racing-button w-full" disabled={!ready || saving} onClick={start}><span>{saving ? 'VERIFYING CHECK-IN' : 'START YOUR ENGINE'} <ArrowRight size={18} /></span></button>
+          {saveError && <p className="alert alert-error inspection-error" role="alert">{saveError}</p>}
           <p className={'inspection-ready-note ' + (ready ? 'is-ready' : '')} aria-live="polite">{ready ? 'All systems ready. See you on the grid.' : 'Complete all checks to unlock your engine.'}</p>
           <div className="inspection-event-label">CODE GRAND PRIX 2026<span>23 NOVEMBER · CPC CLUB</span></div>
         </aside>

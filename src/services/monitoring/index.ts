@@ -4,6 +4,7 @@ export const isMonitoringMock = isDevelopmentMock
 const backend = () => import('./backend').then(module => module.backendMonitoringService)
 const transport = import.meta.env.DEV && isDevelopmentMock ? () => import('./mock').then(module=>module.mockMonitoringService) : backend
 export const monitoringService: MonitoringService = {
+  authorizeSession: (...args) => transport().then(service => service.authorizeSession(...args)),
   getSession: (...args) => transport().then(service => service.getSession(...args)),
   getViewer: (...args) => transport().then(service => service.getViewer(...args)),
   reportIncident: (...args) => transport().then(service => service.reportIncident(...args)),

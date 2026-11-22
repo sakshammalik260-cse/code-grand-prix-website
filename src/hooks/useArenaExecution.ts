@@ -27,7 +27,7 @@ export function useArenaExecution({ request, allowed, onBusyChange, onProgress }
     let value = initial
     for (let attempt = 0; (value.status === 'QUEUED' || value.status === 'RUNNING') && attempt < 80; attempt++) {
       await delay(450, signal)
-      value = await arenaServices.getSubmission(value.id, signal)
+      value = { ...value, ...await arenaServices.getSubmission(value.id, signal) }
       if (!signal.aborted) remember(value)
     }
     if (value.status === 'QUEUED' || value.status === 'RUNNING') throw new Error('Your submission is queued, but the result is delayed. Use “Check result” to retrieve it without submitting again.')
@@ -55,7 +55,6 @@ export function useArenaExecution({ request, allowed, onBusyChange, onProgress }
           value = await arenaServices.submitCode(payload, signal)
           if (signal.aborted) return
           setSubmitting(false); remember(value)
-          await onProgress(signal)
         }
         await poll(value, signal)
       }
@@ -65,7 +64,7 @@ export function useArenaExecution({ request, allowed, onBusyChange, onProgress }
       locked.current = false
       if (mounted.current) { setOperation(null); setSubmitting(false); onBusyChange(false) }
     }
-  }, [request, allowed, onBusyChange, onProgress, remember, poll])
+  }, [request, allowed, onBusyChange, remember, poll])
   return { operation, lastAction, runResult, submission, submitting, history, error,
     run: useCallback(() => execute('run'), [execute]),
     submit: useCallback(() => execute('submit'), [execute]),

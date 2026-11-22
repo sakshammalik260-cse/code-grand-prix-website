@@ -1,5 +1,6 @@
 import { authService } from '../auth'
 import type { CompetitionSession, Incident, MonitoringService, ParticipantScope, ResolutionResponse, SessionStatus } from '../../types/monitoring'
+import { authorizeSessionInLedger } from './sessionAuthorization'
 import { ledgerTransaction } from './ledger'
 import { sessionAllowsExecution } from './sessionRules'
 import { delay } from '../arena/mockState'
@@ -26,6 +27,11 @@ function changeState(session: CompetitionSession, status: SessionStatus): Compet
   return { ...session, status, revision: session.revision + 1, updatedAt: new Date().toISOString(), policy: { allowExecution: allowed, allowEditing: allowed || status === 'FINISHED', allowNavigation: allowed || status === 'FINISHED' } }
 }
 export const mockMonitoringService: MonitoringService = {
+  async authorizeSession(id,request,signal) {
+    await prepare(signal)
+    const viewer = await this.getViewer(signal)
+    return ledgerTransaction(true,ledger => authorizeSessionInLedger(ledger,id,request,viewer))
+  },
   async getSession(scope,signal) {
     await prepare(signal)
     return ledgerTransaction(true,ledger => {
@@ -66,6 +72,7 @@ export const mockMonitoringService: MonitoringService = {
       const incident = ledger.incidents.find(item => item.id === id)
       if (!incident) throw new Error('This incident is unavailable. Refresh the review list.')
       const session = ledger.sessions[key(incident)]
+      if (!session || session.id !== incident.sessionId || incident.reviewStatus === 'AUTHORIZED') throw new MonitoringTransportError('Incident is already authorized or its session is unavailable. Refresh race control.','CONFLICT')
       if (session.revision !== request.expectedSessionRevision) throw new MonitoringTransportError('Session changed while you reviewed it. Refresh and review the latest incident.','CONFLICT')
       if (request.decision !== 'AUTHORIZE_RESUME') incident.blocking = true
       incident.reviewStatus = request.decision === 'AUTHORIZE_RESUME' ? 'AUTHORIZED' : request.decision === 'ESCALATE' ? 'ESCALATED' : 'KEPT_LOCKED'

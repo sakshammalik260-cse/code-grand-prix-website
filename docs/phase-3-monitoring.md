@@ -1,3 +1,5 @@
+> Current lock guards and atomic session-level recovery supersede the individual-only recovery instructions below. See [monitoring bulk authorization fix](monitoring-bulk-authorization-fix.md).
+
 > Phase 4 supersedes the role names, mock role selector and self-approval controls in this historical guide. Roles are now CANDIDATE, VOLUNTEER and ADMIN. Staff authorization requires a separate staff account; production always uses API adapters. See [current contracts and recovery changes](admin-question-management.md).
 
 # Phase 3: session monitoring and volunteer review

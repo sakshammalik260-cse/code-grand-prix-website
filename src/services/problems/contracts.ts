@@ -1,9 +1,32 @@
-import type { ProblemInput } from '../../types/problems'
+import type { AdminOverview, ContestRound, ProblemInput } from '../../types/problems'
 import type { Problem,ProblemSummary } from '../../types/arena'
 const supportedLanguages=['cpp','python','java','javascript']
+const phases = ['WAITING', 'LIVE', 'PAUSED_BY_ORGANIZER', 'FINISHED']
+const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+const isActiveRound = (value: unknown): value is ContestRound => {
+  if (typeof value !== 'object' || value === null) return false
+  const round = value as Partial<ContestRound>
+  return typeof round.id === 'string' && !!round.id && typeof round.title === 'string' &&
+    round.status === 'LIVE' && typeof round.resultsVisible === 'boolean' &&
+    typeof round.startsAt === 'string' && Number.isFinite(Date.parse(round.startsAt)) &&
+    typeof round.endsAt === 'string' && Date.parse(round.endsAt) > Date.parse(round.startsAt)
+}
+
+export function parseAdminOverview(value: unknown): AdminOverview {
+  const overview = value as Partial<AdminOverview> | null
+  if (!overview || typeof overview !== 'object' ||
+      !isCount(overview.totalQuestions) || !isCount(overview.draftQuestions) ||
+      !isCount(overview.publishedQuestions) || !isCount(overview.participants) ||
+      typeof overview.competitionStatus !== 'string' || !phases.includes(overview.competitionStatus) ||
+      !isCount(overview.activeRoundCount) || !Array.isArray(overview.activeRounds) ||
+      overview.activeRounds.length !== overview.activeRoundCount || !overview.activeRounds.every(isActiveRound)) {
+    throw new Error('Race Control returned an invalid administration overview.')
+  }
+  return overview as AdminOverview
+}
 // Whitelist fields so administration metadata never enters candidate rendering or draft requests.
 export function questionPayload(value:ProblemInput):ProblemInput {
- return {title:value.title,difficulty:value.difficulty,points:value.points,statement:value.statement,inputFormat:value.inputFormat,outputFormat:value.outputFormat,constraints:value.constraints,samples:value.samples.map(s=>({id:s.id,input:s.input,output:s.output,explanation:s.explanation})),timeLimitMs:value.timeLimitMs,memoryLimitMb:value.memoryLimitMb,expectedTimeComplexity:value.expectedTimeComplexity,expectedSpaceComplexity:value.expectedSpaceComplexity,allowedLanguages:value.allowedLanguages,roundId:value.roundId,hints:(value.hints||[]).map(h=>({id:h.id,order:h.order,deductionPoints:h.deductionPoints,content:h.content}))}
+ return {title:value.title,difficulty:value.difficulty,points:value.points,statement:value.statement,inputFormat:value.inputFormat,outputFormat:value.outputFormat,constraints:value.constraints,samples:value.samples.map(s=>({id:s.id,input:s.input,output:s.output,explanation:s.explanation})),timeLimitMs:value.timeLimitMs,memoryLimitMb:value.memoryLimitMb,expectedTimeComplexity:value.expectedTimeComplexity,expectedSpaceComplexity:value.expectedSpaceComplexity,allowedLanguages:value.allowedLanguages,roundId:value.roundId,order:value.order,hints:(value.hints||[]).map(h=>({id:h.id,order:h.order,deductionPoints:h.deductionPoints,content:h.content}))}
 }
 function record(value:unknown):Record<string,unknown>{if(!value||typeof value!=='object')throw new Error('Invalid question response. Refresh or contact race control.');return value as Record<string,unknown>}
 function assertPublic(value:Record<string,unknown>){

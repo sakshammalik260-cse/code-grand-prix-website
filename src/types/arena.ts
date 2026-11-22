@@ -27,6 +27,8 @@ export interface ContestState {
   id: string
   title: string
   round: string
+  roundId?: string | null
+  roundNumber?: number
   status: ContestPhase
   contestStartTime: string
   contestEndTime: string
@@ -34,7 +36,7 @@ export interface ContestState {
   pausedAt?: string
   simulation: boolean
 }
-export type Verdict = 'ACCEPTED' | 'WRONG_ANSWER' | 'COMPILATION_ERROR' | 'RUNTIME_ERROR' | 'TIME_LIMIT_EXCEEDED' | 'MEMORY_LIMIT_EXCEEDED'
+export type Verdict = 'ACCEPTED' | 'WRONG_ANSWER' | 'COMPILATION_ERROR' | 'RUNTIME_ERROR' | 'TIME_LIMIT_EXCEEDED' | 'MEMORY_LIMIT_EXCEEDED' | 'INTERNAL_ERROR'
 export type SubmissionStatus = 'QUEUED' | 'RUNNING' | Verdict
 export type MockScenario = Verdict | 'NETWORK_ERROR'
 export interface CodeExecutionRequest {

@@ -1,0 +1,58 @@
+/* Match the original center-bottom / cover crop without moving or copying the plate. */
+.living-race-background {
+  display: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.living-race-background > g { opacity: 0; }
+@supports (animation-name: race-rear-pulse) {
+  .living-race-background { display: block; }
+  .race-rear-bloom { animation: race-rear-pulse 2.1s ease-in-out infinite; }
+  .race-rear-core { animation: race-rear-core 2.1s ease-in-out infinite; }
+  .race-rear-reflection { animation: race-rear-reflection 2.1s ease-in-out infinite; }
+  .race-tire-haze { animation: race-tire-haze 7.6s ease-in-out infinite; }
+  .living-race-background > .race-track-layer { opacity: 1; }
+  .race-barrier-travel { opacity: 0; animation: race-barrier-travel 6.4s linear infinite; }
+  .race-barrier-delayed { animation-delay: -3.2s; }
+  .race-road-travel { opacity: 0; animation: race-road-travel 8.4s linear infinite; }
+  .race-crowd-light { animation: race-crowd-light 9.6s ease-in-out infinite; }
+  .race-stadium-light { animation: race-stadium-light 10.8s ease-in-out infinite; }
+  .race-stadium-haze { animation: race-stadium-haze 13s ease-in-out infinite; }
+}
+.living-race-background[data-paused="true"] g { animation-play-state: paused; }
+@keyframes race-rear-pulse { 0%, 100% { opacity: .18; } 50% { opacity: .48; } }
+@keyframes race-rear-core { 0%, 100% { opacity: .08; } 50% { opacity: .3; } }
+@keyframes race-rear-reflection { 0%, 100% { opacity: .025; } 50% { opacity: .1; } }
+@keyframes race-tire-haze {
+  0%, 100% { opacity: .05; transform: translate(0, 0); }
+  50% { opacity: .12; transform: translate(4px, -2px); }
+}
+@keyframes race-barrier-travel {
+  0% { opacity: 0; transform: translate(0, 0) scale(.18); }
+  18% { opacity: .12; }
+  68% { opacity: .38; }
+  100% { opacity: 0; transform: translate(625px, -80px) scale(1); }
+}
+@keyframes race-road-travel {
+  0% { opacity: 0; transform: translate(0, 0) scale(.15); }
+  24% { opacity: .025; }
+  70% { opacity: .12; }
+  100% { opacity: 0; transform: translate(520px, 170px) scale(1); }
+}
+@keyframes race-crowd-light { 0%, 100% { opacity: .025; } 50% { opacity: .09; } }
+@keyframes race-stadium-light { 0%, 100% { opacity: .025; } 50% { opacity: .09; } }
+@keyframes race-stadium-haze {
+  0%, 100% { opacity: .035; transform: translate(0, 0); }
+  50% { opacity: .09; transform: translate(-4px, 2px); }
+}
+/* The existing mobile plate uses a different crop; retain its exact static design. */
+@media (max-width: 700px), (prefers-reduced-motion: reduce) {
+  .living-race-background { display: none; }
+  .living-race-background g { animation: none; }
+}
