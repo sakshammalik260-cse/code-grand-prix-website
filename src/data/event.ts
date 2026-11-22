@@ -4,8 +4,8 @@ export const event = {
   organizer: 'CPC - Competitive Programming Club',
   university: 'Jain (Deemed-to-be) University',
   dateLabel: 'November 23, 2026',
-  // Date-only countdown. The competition's start time is still to be announced.
-  date: '2026-11-23T00:00:00+05:30',
+  timeLabel: '12:30 PM IST',
+  date: '2026-11-23T12:30:00+05:30',
   timezone: 'Asia/Kolkata',
 }
 export const demoCredentials = { driverId: 'CGP2026', password: 'Race2026!' }

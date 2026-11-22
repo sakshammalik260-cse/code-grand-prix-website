@@ -52,14 +52,14 @@ export function LandingPage() {
         <aside className={styles.eventControl} data-hero-layer="control" aria-labelledby="event-day-title">
           <div className={styles.eventControlHeader}>
             <span>RACE CONTROL / ROUND 01</span>
-            <StatusIndicator tone="caution">Start TBA</StatusIndicator>
+            <StatusIndicator tone="accent">Starts 12:30 PM IST</StatusIndicator>
           </div>
           <p className={styles.eventDate}>{event.dateLabel.toUpperCase()}</p>
           <p className={styles.eventOrganizer}>CPC / COMPETITIVE PROGRAMMING CLUB</p>
           <div className={styles.countdownPanel}>
-            <h2 id="event-day-title">Event day in</h2>
+            <h2 id="event-day-title">Event starts in</h2>
             <Countdown />
-            <p>Counts down to the published event date. Official race timing will be announced separately.</p>
+            <p>Counts down to official race start at 12:30 PM IST ({event.dateLabel}).</p>
           </div>
           <div className={styles.heroActions}>
             <Link className={`${styles.primaryAction} race-action`} to="/login">ENTER THE GRID <ArrowRight size={19} /></Link>
@@ -73,7 +73,7 @@ export function LandingPage() {
         <div><dt>Promoter</dt><dd>CPC Club</dd></div>
         <div><dt>Host institution</dt><dd>{event.university}</dd></div>
         <div><dt>Round</dt><dd>01 / 2026</dd></div>
-        <div><dt>Race start</dt><dd>To be announced</dd></div>
+        <div><dt>Race start</dt><dd>12:30 PM IST</dd></div>
       </dl>
     </section>
 

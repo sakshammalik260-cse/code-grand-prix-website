@@ -40,8 +40,8 @@ export function LandingContent() {
     <section className={styles.eventRail} data-scroll-section aria-label="Event timing summary">
       <div className={styles.sectionFrame} data-stagger>
         <div className={styles.railDate} data-stagger-item><CalendarDays size={22} aria-hidden="true" /><span><small>MARK YOUR CALENDAR</small><strong>{event.dateLabel.toUpperCase()}</strong></span></div>
-        <div className={styles.railStatus} data-stagger-item><span aria-hidden="true" /><div><small>SCHEDULE STATUS</small><strong>RACE START TBA</strong></div></div>
-        <div className={styles.railCountdown} data-stagger-item><span><small>EVENT DATE IN</small><em>Race start TBA</em></span><Countdown compact /></div>
+        <div className={styles.railStatus} data-stagger-item><span aria-hidden="true" /><div><small>SCHEDULE STATUS</small><strong>RACE START 12:30 PM IST</strong></div></div>
+        <div className={styles.railCountdown} data-stagger-item><span><small>EVENT DATE IN</small><em>12:30 PM IST</em></span><Countdown compact /></div>
       </div>
     </section>
 
@@ -61,7 +61,7 @@ export function LandingContent() {
               <div><dt>Date</dt><dd>{event.dateLabel.toUpperCase()}</dd></div>
               <div><dt>Round</dt><dd>ROUND 01</dd></div>
               <div><dt>Timezone</dt><dd>IST / UTC+05:30</dd></div>
-              <div><dt>Race start</dt><dd>TO BE ANNOUNCED</dd></div>
+              <div><dt>Race start</dt><dd>12:30 PM IST</dd></div>
             </dl>
             <p><Radio size={15} aria-hidden="true" /> Timing, problem release and results visibility remain under CPC Race Control.</p>
           </aside>
