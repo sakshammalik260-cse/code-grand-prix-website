@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Camera, CameraOff, Check, Circle, Expand, LoaderCircle, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react'
 import { useCamera } from '../hooks/useCamera'
 import { useSession } from '../hooks/useSession'
-import { CheckeredFlag } from '../components/RacingIdentity'
-
 export function CheckInPage() {
   const { driver, completeCheckIn } = useSession()
   const navigate = useNavigate()
@@ -52,7 +50,6 @@ export function CheckInPage() {
   ]
   const nextStep = inspectionSteps.findIndex(step => !step.done)
   return <section className="cinematic-page inspection-page">
-    <CheckeredFlag className="dashboard-flag" />
     <div className="inspection-content container">
       <div className="dashboard-heading"><h1>PRE-RACE INSPECTION</h1><p>Verify your setup. Prepare for the grid.</p></div>
       <div className="inspection-layout">

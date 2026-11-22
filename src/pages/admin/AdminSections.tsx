@@ -150,7 +150,7 @@ export function AdminRaceControlStrip({ onActionTriggered }: { onActionTriggered
           </div>
           {state?.activeRound && (
             <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-              Round: <strong style={{ color: '#fff' }}>{state.activeRound.title}</strong>
+              Round: <strong style={{ color: '#fff' }}>{typeof state.activeRound === 'object' && state.activeRound !== null ? (state.activeRound.title || state.activeRound.id || 'Active') : String(state.activeRound)}</strong>
             </span>
           )}
         </div>
@@ -274,7 +274,9 @@ export function AdminRaceControlStrip({ onActionTriggered }: { onActionTriggered
 // ==============================================================================
 export function AdminDashboard() {
   const resource = useRemoteResource(overview)
-  const compStatus = resource.data?.competitionStatus ? resource.data.competitionStatus.replaceAll('_', ' ') : '--'
+  const compStatus = typeof resource.data?.competitionStatus === 'string'
+    ? resource.data.competitionStatus.replaceAll('_', ' ')
+    : String(resource.data?.competitionStatus ?? '--')
   const activeRoundsCount = typeof resource.data?.activeRounds === 'number'
     ? resource.data.activeRounds
     : (Array.isArray(resource.data?.activeRounds) ? (resource.data.activeRounds as unknown[]).length : '--')

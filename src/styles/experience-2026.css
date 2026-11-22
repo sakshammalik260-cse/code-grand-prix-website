@@ -961,7 +961,7 @@ textarea {
 
 .arena-driver-menu summary:focus-visible,
 .arena-driver-summary:focus-visible {
-  outline: 2px solid var(--cgp-amber, #ffcc00);
+  outline: 2px solid var(--cgp-red, #f20d18);
   outline-offset: 1px;
 }
 
@@ -1274,7 +1274,13 @@ textarea {
 
 .driver-login-panel .input-wrap {
   position: relative;
+  outline: none !important;
   transition: transform var(--cgp-duration-base) var(--cgp-ease-standard), box-shadow var(--cgp-duration-base) var(--cgp-ease-standard);
+}
+
+.driver-login-panel .input-wrap:hover {
+  border-color: #a4a7b5 !important;
+  outline: none !important;
 }
 
 .driver-login-panel .input-wrap::after {
@@ -1283,14 +1289,19 @@ textarea {
   bottom: 0;
   left: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--cgp-red), var(--cgp-red-soft));
+  background: var(--cgp-red);
   content: '';
   transform: scaleX(0);
   transform-origin: left;
   transition: transform var(--cgp-duration-base) var(--cgp-ease-enter);
 }
 
-.driver-login-panel .input-wrap:focus-within { transform: translateY(-2px); box-shadow: 0 10px 28px rgb(0 0 0 / 18%); }
+.driver-login-panel .input-wrap:focus-within {
+  transform: translateY(-2px);
+  border-color: var(--cgp-red) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(242, 13, 24, 0.22) !important;
+}
 .driver-login-panel .input-wrap:focus-within::after { transform: scaleX(1); }
 
 .login-access-strip {
