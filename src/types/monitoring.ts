@@ -39,11 +39,17 @@ export interface CompetitionSession extends ParticipantScope {
   resumeAuthorization: Authorization | null
   volunteerNotified: boolean
   simulation: boolean
+  team?: string
+  displayName?: string
+  lockReason?: string
+  lockCount?: number
+  cameraStatus?: string
+  score?: number
 }
 export interface Viewer { id: string; role: 'CANDIDATE' | 'VOLUNTEER' | 'ADMIN'; simulation: boolean }
 export interface SessionEnvelope { viewer: Viewer; session: CompetitionSession | null; serverTime: string }
 export interface IncidentAcknowledgment { incident: Incident; session: CompetitionSession }
-export interface ResolutionRequest { decision: ResolutionDecision; expectedSessionRevision: number; note: string }
+export interface ResolutionRequest { decision: ResolutionDecision; expectedSessionRevision: number; note: string; sessionId?: string }
 export interface ResolutionResponse { incident: Incident; session: CompetitionSession; authorization: Authorization }
 export interface MonitoringService {
   getSession(scope: ParticipantScope, signal?: AbortSignal): Promise<CompetitionSession>
