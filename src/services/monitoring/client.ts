@@ -82,6 +82,16 @@ export class MonitoringClient {
     this.flushing = true
     const generation = this.lifecycle, signal = this.abort.signal
     try {
+      if (this.value.session?.resumeAuthorization?.decidedAt) {
+        const authTime = Date.parse(this.value.session.resumeAuthorization.decidedAt)
+        if (Number.isFinite(authTime)) {
+          const remaining = this.value.pending.filter(item => Date.parse(item.observedAt) > authTime)
+          if (remaining.length !== this.value.pending.length) {
+            this.publish({ pending: remaining })
+            this.persist()
+          }
+        }
+      }
       while (this.running && this.value.pending.length) {
         const request = this.value.pending[0]
         const reply = await monitoringService.reportIncident(request,signal)
