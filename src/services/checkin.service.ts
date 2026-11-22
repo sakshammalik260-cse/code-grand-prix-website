@@ -94,7 +94,7 @@ export class CheckinService {
       reasons,
       session: {
         id: updatedSession.id,
-        driverId: userId,
+        driverId: user?.driverId ?? userId,
         status: updatedSession.status,
         revision: updatedSession.revision,
         lockReason: updatedSession.lockReason,

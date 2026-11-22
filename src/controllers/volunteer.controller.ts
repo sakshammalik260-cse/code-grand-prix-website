@@ -25,7 +25,7 @@ export const authorizeResumeSchema = z.object({
 export class VolunteerController {
   static async listParticipants(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const participants = await VolunteerService.listParticipants();
+      const participants = await VolunteerService.listParticipants(req.user!.role);
       res.status(200).json(participants);
     } catch (error) {
       next(error);

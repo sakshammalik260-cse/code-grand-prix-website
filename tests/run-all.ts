@@ -8,8 +8,10 @@ import { assertIsolatedDatabase } from "./isolation.js";
 
 const requireFromProject = createRequire(resolve("package.json"));
 const prismaCli = requireFromProject.resolve("prisma/build/index.js");
-const liveJudge = process.argv.includes("--judge0");
-const suites = liveJudge ? ["judge0-live"] : ["phase3", "phase4", "phase5", "remediation", "admin-rounds", "judge0-protocol"];
+const liveJudge = process.argv.includes("--piston") ? "piston" :
+  process.argv.includes("--judge0") ? "judge0" : null;
+const suites = liveJudge ? [liveJudge + "-live"] :
+  ["auth-and-standings", "phase3", "phase4", "phase5", "remediation", "admin-rounds", "judge0-protocol", "judge0-rapidapi", "piston-protocol"];
 
 function runChild(args: string[], env: NodeJS.ProcessEnv, quiet = false): Promise<void> {
   return new Promise((complete, reject) => {
@@ -26,10 +28,17 @@ async function main() {
   if (process.env.NODE_ENV === "production") throw new Error("Tests cannot run in production mode.");
   if (liveJudge) {
     process.env.NODE_ENV = "test";
-    const { Judge0Adapter, JudgeUnavailable } = await import("../src/judge/judge0.adapter.js");
-    try { await new Judge0Adapter().getLanguages(); }
-    catch (error) {
-      console.error("Judge0 live integration unavailable (" + (error instanceof JudgeUnavailable ? error.stage : "configuration") + ").");
+    const { JudgeUnavailable } = await import("../src/judge/judge-transport.js");
+    try {
+      if (liveJudge === "piston") {
+        const { PistonAdapter } = await import("../src/judge/piston.adapter.js");
+        await new PistonAdapter().getRuntimes();
+      } else {
+        const { Judge0Adapter } = await import("../src/judge/judge0.adapter.js");
+        await new Judge0Adapter().getLanguages();
+      }
+    } catch (error) {
+      console.error(liveJudge + " live integration unavailable (" + (error instanceof JudgeUnavailable ? error.stage : "configuration") + ").");
       process.exitCode = 1;
       return;
     }
@@ -47,7 +56,13 @@ async function main() {
       DATABASE_URL: url.href,
       NODE_ENV: "test",
       ALLOW_DEV_FALLBACK: "false",
-      JUDGE_PROVIDER: liveJudge ? "judge0" : "local",
+      LOGIN_RATE_LIMIT_STORE: "postgres",
+      LOGIN_SOURCE_LIMIT: "40",
+      TRUST_PROXY: "",
+      ALLOWED_ORIGINS: "http://127.0.0.1:5173,http://localhost:5173",
+      COOKIE_SECURE: "false",
+      COOKIE_SAME_SITE: "lax",
+      JUDGE_PROVIDER: liveJudge ?? "local",
       CONTEST_ID: "cgp_2026",
       CONTEST_STATUS: "LIVE"
     };
@@ -62,7 +77,11 @@ async function main() {
       step = "Seed the isolated test schema";
       await runChild(["--import", "tsx", "prisma/seed.ts"], env);
       step = `Run ${suite}`;
-      await runChild(["--import", "tsx", `tests/${suite}.test.ts`], env);
+      const hostedProtocol = suite === "judge0-rapidapi";
+      const file = hostedProtocol ? "judge0-protocol" : suite;
+      await runChild(["--import", "tsx", `tests/${file}.test.ts`], {
+        ...env, CGP_JUDGE0_PROTOCOL_AUTH_MODE: hostedProtocol ? "rapidapi" : "self-hosted"
+      });
       console.log(`PASS ${suite}`);
     } catch {
       failed = true;

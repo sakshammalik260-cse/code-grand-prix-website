@@ -43,7 +43,7 @@ export class HintRepository {
       // Fallback
     }
 
-    if (!hints || hints.length === 0) {
+    if (hints.length === 0 && env.NODE_ENV !== "production" && env.ALLOW_DEV_FALLBACK) {
       hints = inMemoryHints.get(problemId) || [];
     }
 
@@ -98,6 +98,7 @@ export class HintRepository {
       // Fallback
     }
 
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) return null;
     for (const list of inMemoryHints.values()) {
       const found = list.find((h) => h.id === hintId);
       if (found) return found;

@@ -12,7 +12,9 @@
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",
     "test": "tsx tests/run-all.ts",
-    "test:judge0": "tsx tests/run-all.ts --judge0"
+    "test:judge0": "tsx tests/run-all.ts --judge0",
+    "test:piston": "tsx tests/run-all.ts --piston",
+    "test:piston:smoke": "tsx tests/piston-smoke.ts"
   },
   "keywords": [
     "competitive-programming",

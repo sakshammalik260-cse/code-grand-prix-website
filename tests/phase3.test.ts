@@ -3,6 +3,7 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
 import { assertIsolatedDatabase } from "./isolation.js";
 import { prisma } from "../src/config/database.js";
 import { createApp } from "../src/app.js";
@@ -30,7 +31,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -142,11 +143,11 @@ async function runTests() {
       password: "driver123"
     });
     assert(
-      participantLogin.status === 200 && participantLogin.body.token !== undefined,
+      participantLogin.status === 200 && authCookie(participantLogin.headers["set-cookie"]) !== undefined,
       "Valid participant login returns 200 with JWT token and profile",
       JSON.stringify(participantLogin.body)
     );
-    const participantToken = participantLogin.body.token;
+    const participantToken = authCookie(participantLogin.headers["set-cookie"]);
     assert(
       participantLogin.body.user.driverId === "CGP_045" &&
         participantLogin.body.user.role === "CANDIDATE",

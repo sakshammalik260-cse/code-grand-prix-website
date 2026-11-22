@@ -1,14 +1,28 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
-import { ERROR_CODES, VERDICTS, type VerdictType } from "../constants/index.js";
+import { VERDICTS, type VerdictType } from "../constants/index.js";
 import { env } from "../config/env.js";
-import { AppError } from "../middleware/error.middleware.js";
 import type { IJudgeAdapter, JudgeExecutionRequest, JudgeExecutionResult } from "./judge.interface.js";
 
-export class JudgeUnavailable extends AppError {
-  constructor(readonly stage: string) {
-    super(503, ERROR_CODES.JUDGE_UNAVAILABLE, "Code execution is temporarily unavailable. Try again or contact race control.");
-  }
+import { JudgeUnavailable, readJudgeJson } from "./judge-transport.js";
+export { JudgeUnavailable } from "./judge-transport.js";
+
+const rapidApiHost = "judge0-ce.p.rapidapi.com";
+const nativeReservedHeaders = /^(accept|connection|content-.*|cookie|expect|host|keep-alive|origin|proxy-.*|sec-.*|te|trailer|transfer-encoding|upgrade|x-rapidapi-.*)$/i;
+const rapidApiBillingQuotas = [
+  "x-ratelimit-requests",
+  "x-ratelimit-submissions",
+  "x-rate-limit-rapid-free-plans-hard-limit"
+];
+const maxQuotaDelayMs = 31 * 24 * 60 * 60 * 1000;
+
+function secondsToMs(value: string | null) {
+  return value && /^\d+$/.test(value) ? Math.min(Number(value) * 1000, maxQuotaDelayMs) : 0;
+}
+
+function retryAfterMs(value: string | null) {
+  if (!value || /^\d+$/.test(value)) return secondsToMs(value);
+  return Math.max(0, Math.min(Date.parse(value) - Date.now(), maxQuotaDelayMs)) || 0;
 }
 
 const supported = {
@@ -27,31 +41,6 @@ const resultSchema = statusSchema.extend({
   time: z.union([z.string(), z.number()]).nullable(), memory: z.number().nonnegative().nullable()
 });
 
-async function readJson(response: Response, limit: number): Promise<unknown> {
-  if (!response.body || Number(response.headers.get("content-length")) > limit) {
-    await response.body?.cancel();
-    throw new JudgeUnavailable("response-size");
-  }
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > limit) {
-        await reader.cancel();
-        throw new JudgeUnavailable("response-size");
-      }
-      chunks.push(value);
-    }
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  } finally {
-    reader.releaseLock();
-  }
-}
-
 function decode(value: string | null): Buffer {
   if (!value) return Buffer.alloc(0);
   // Judge0 uses Ruby Base64.encode64, which wraps lines.
@@ -65,14 +54,34 @@ export class Judge0Adapter implements IJudgeAdapter {
   private catalog?: { expiresAt: number; languages: Record<Language, { id: number; name: string }> };
   private discovering?: Promise<NonNullable<Judge0Adapter["catalog"]>>;
   private readonly apiUrl: string;
+  private readonly headers: Headers;
+  private readonly hosted = env.JUDGE0_AUTH_MODE === "rapidapi";
+  private throttledUntil = 0;
+  private submissionQuotaUntil = 0;
 
   constructor() {
     try {
       const url = new URL(env.JUDGE0_API_URL);
-      const loopback = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
-      if ((url.protocol !== "https:" && (url.protocol !== "http:" || !loopback)) ||
-          url.username || url.password || url.search || url.hash || env.JUDGE0_API_KEY.length < 32) {
-        throw new JudgeUnavailable("configuration");
+      if (url.username || url.password || url.search || url.hash) throw new JudgeUnavailable("configuration");
+      this.headers = new Headers({ Accept: "application/json", "Content-Type": "application/json" });
+      if (this.hosted) {
+        const host = env.JUDGE0_RAPIDAPI_HOST;
+        const key = env.JUDGE0_RAPIDAPI_KEY;
+        // Never send a marketplace key to a custom origin, proxy, or redirect.
+        if (host !== rapidApiHost || url.origin !== "https://" + host || url.pathname !== "/" ||
+            !/^[!-~]+$/.test(key)) throw new JudgeUnavailable("configuration");
+        this.headers.set("X-RapidAPI-Key", key);
+        this.headers.set("X-RapidAPI-Host", host);
+      } else {
+        const loopback = ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname);
+        const key = env.JUDGE0_API_KEY;
+        const header = env.JUDGE0_AUTH_HEADER;
+        if ((url.protocol !== "https:" && (url.protocol !== "http:" || !loopback)) ||
+            url.hostname.endsWith(".p.rapidapi.com") || key.length < 32 || !/^[ -~]+$/.test(key) ||
+            key !== key.trim() || nativeReservedHeaders.test(header) || header !== header.trim()) {
+          throw new JudgeUnavailable("configuration");
+        }
+        this.headers.set(header, key);
       }
       this.apiUrl = url.href.replace(/\/$/, "");
     } catch {
@@ -80,20 +89,43 @@ export class Judge0Adapter implements IJudgeAdapter {
     }
   }
 
+  private noteHostedLimits(response: Response) {
+    const now = Date.now();
+    for (const quota of rapidApiBillingQuotas) {
+      if (response.headers.get(quota + "-remaining") === "0") {
+        const delay = secondsToMs(response.headers.get(quota + "-reset")) || 60000;
+        this.submissionQuotaUntil = Math.max(this.submissionQuotaUntil, now + delay);
+      }
+    }
+    if (response.status === 429 || response.status === 402) {
+      const responseDelay = retryAfterMs(response.headers.get("retry-after")) ||
+        secondsToMs(response.headers.get("x-ratelimit-reset")) || 60000;
+      this.throttledUntil = Math.max(this.throttledUntil, now + responseDelay, this.submissionQuotaUntil);
+    }
+  }
+
   private async request(path: string, signal: AbortSignal, limit: number, payload?: object) {
+    if (this.hosted && (Date.now() < this.throttledUntil ||
+        (payload && Date.now() < this.submissionQuotaUntil))) throw new JudgeUnavailable("hosted-cooldown");
+
     try {
       const response = await fetch(this.apiUrl + path, {
         method: payload ? "POST" : "GET",
         redirect: "error",
-        headers: { Accept: "application/json", "Content-Type": "application/json", "X-Auth-Token": env.JUDGE0_API_KEY },
+        headers: this.headers,
         signal: AbortSignal.any([signal, AbortSignal.timeout(env.JUDGE0_HTTP_TIMEOUT_MS)]),
         body: payload ? JSON.stringify(payload) : undefined
       });
+      if (this.hosted) this.noteHostedLimits(response);
       if (!response.ok) {
         await response.body?.cancel();
         throw new JudgeUnavailable("upstream-http-" + response.status);
       }
-      return await readJson(response, limit);
+      if (this.hosted && response.headers.get("x-rapidapi-mock-response")?.toLowerCase() === "true") {
+        await response.body?.cancel();
+        throw new JudgeUnavailable("hosted-mock-response");
+      }
+      return await readJudgeJson(response, limit);
     } catch (error) {
       if (error instanceof JudgeUnavailable) throw error;
       throw new JudgeUnavailable(signal.aborted ? "deadline" : "transport-or-protocol");
@@ -106,7 +138,12 @@ export class Judge0Adapter implements IJudgeAdapter {
       this.request("/about", signal, 16384),
       this.request("/languages", signal, 65536)
     ]);
-    if (!about || typeof about !== "object" || !("version" in about) || about.version !== "1.13.1") {
+    const version = about && typeof about === "object" && "version" in about ? about.version : undefined;
+    // Keep the native deployment pinned. The managed gateway can update within CE 1.x.
+    const hostedVersion = typeof version === "string" ? /^1\.(\d+)\.(\d+)$/.exec(version) : null;
+    const hostedVersionSupported = hostedVersion &&
+      (Number(hostedVersion[1]) > 13 || Number(hostedVersion[1]) === 13 && Number(hostedVersion[2]) >= 1);
+    if (this.hosted ? !hostedVersionSupported : version !== "1.13.1") {
       throw new JudgeUnavailable("unsupported-version");
     }
     const parsed = catalogSchema.safeParse(rows);

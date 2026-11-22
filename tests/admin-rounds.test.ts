@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { authCookie } from "./http-auth.js";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { createApp } from "../src/app.js";
@@ -14,18 +15,18 @@ async function main() {
   assert.ok(address && typeof address === "object");
   const origin = "http://127.0.0.1:" + address.port + "/api";
   let checked = 0;
-  async function request(method: string, path: string, status: number, token?: string, body?: unknown) {
+  async function request(method: string, path: string, status: number, token?: string, body?: unknown, cookie = false) {
     const response = await fetch(origin + path, { method,
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+      headers: { "Content-Type": "application/json", ...(token ? { Cookie: token } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) });
     const data = response.status === 204 ? null : await response.json();
     assert.equal(response.status, status, method + " " + path + " (" + (data?.error?.code ?? "no error") + ")");
     checked++;
-    return data;
+    return cookie ? authCookie(response.headers.getSetCookie()) : data;
   }
   async function login(driverId: string) {
     const user = SEED_DATA.users.find(user => user.driverId === driverId)!;
-    return (await request("POST", "/auth/login", 200, undefined, { driverId, password: user.password })).token as string;
+    return (await request("POST", "/auth/login", 200, undefined, { driverId, password: user.password }, true)) as string;
   }
   const read = (path: string, status: number, token?: string) => request("GET", path, status, token);
   const write = (path: string, status: number, token: string, body: unknown = {}) => request("POST", path, status, token, body);

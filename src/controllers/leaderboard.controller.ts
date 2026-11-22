@@ -11,7 +11,7 @@ import { LeaderboardService } from "../services/leaderboard.service.js";
 export class LeaderboardController {
   static async getLeaderboard(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const userRole = req.user ? req.user.role : "CANDIDATE";
+      const userRole = req.user!.role;
       const leaderboard = await LeaderboardService.getLeaderboard(userRole);
       res.status(200).json(leaderboard);
     } catch (error) {

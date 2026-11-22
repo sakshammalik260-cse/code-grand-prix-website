@@ -370,3 +370,12 @@ model RevokedToken {
 
   @@map("revoked_tokens")
 }
+
+model LoginRateBucket {
+  key       String   @id
+  attempts  Int
+  expiresAt DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("login_rate_buckets")
+}

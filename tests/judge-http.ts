@@ -1,4 +1,5 @@
 ﻿import assert from "node:assert/strict";
+import { authCookie } from "./http-auth.js";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
 import type { AddressInfo } from "node:net";
@@ -23,21 +24,21 @@ export async function harness() {
   const server = createServer(createApp());
   const base = await listen(server);
   let checks = 0;
-  async function request(path: string, status: number, token?: string, body?: unknown) {
+  async function request(path: string, status: number, token?: string, body?: unknown, cookie = false) {
     const response = await fetch(base + "/api" + path, {
       method: body === undefined ? "GET" : "POST",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+      headers: { "Content-Type": "application/json", ...(token ? { Cookie: token } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(200000)
     });
     const result = await response.json();
     assert.equal(response.status, status, path + ": " + (result?.error?.code ?? "response"));
     checks++;
-    return result;
+    return cookie ? authCookie(response.headers.getSetCookie()) : result;
   }
   const login = async (driverId: string) =>
     (await request("/auth/login", 200, undefined, {
       driverId, password: SEED_DATA.users.find(user => user.driverId === driverId)!.password
-    })).token as string;
+    }, true)) as string;
   const checkin = (token: string) => request("/checkin", 200, token, {
     rulesAccepted: true, cameraPermission: true, fullscreenRequested: true
   });

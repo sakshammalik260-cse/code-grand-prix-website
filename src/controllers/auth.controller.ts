@@ -6,28 +6,39 @@ import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { AuthService } from "../services/auth.service.js";
 import { env } from "../config/env.js";
+import { AppError } from "../middleware/error.middleware.js";
+import { beginLogin, LoginThrottled, refundLogin } from "../services/login-rate-limit.js";
 
 export const loginSchema = z.object({
-  driverId: z.string().min(1, "driverId is required").trim(),
-  password: z.string().min(1, "password is required")
+  driverId: z.string().trim().min(1, "driverId is required").max(128),
+  password: z.string().min(1, "password is required").max(1024)
 });
 
 export class AuthController {
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
+    res.set("Cache-Control", "no-store");
     try {
       const { driverId, password } = req.body;
-      const result = await AuthService.login(driverId, password);
+      const reservations = await beginLogin(req.ip ?? "", driverId);
+      let login;
+      try {
+        login = await AuthService.login(driverId, password);
+      } catch (error) {
+        if (!(error instanceof AppError && error.statusCode === 401)) await refundLogin(reservations);
+        throw error;
+      }
+      await refundLogin(reservations);
 
-      // Set secure HttpOnly cookie
-      res.cookie("auth_token", result.token, {
+      const { token, ...profile } = login;
+      res.cookie("auth_token", token, {
         httpOnly: true,
         secure: env.COOKIE_SECURE,
         sameSite: env.COOKIE_SAME_SITE,
-        maxAge: 8 * 60 * 60 * 1000 // 8 hours
+        maxAge: env.JWT_EXPIRES_IN * 1000
       });
-
-      res.status(200).json(result);
+      res.status(200).json(profile);
     } catch (error) {
+      if (error instanceof LoginThrottled) res.set("Retry-After", String(error.retryAfter));
       next(error);
     }
   }

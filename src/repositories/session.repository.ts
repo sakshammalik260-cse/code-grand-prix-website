@@ -5,8 +5,12 @@ import { env } from "../config/env.js";
 
 import { prisma } from "../config/database.js";
 import { CheckinStatus, RaceSessionStatus, Session } from "@prisma/client";
+import { AppError } from "../middleware/error.middleware.js";
+import { ERROR_CODES } from "../constants/index.js";
 
 const inMemorySessions: Map<string, Session> = new Map();
+const lockedStatuses: RaceSessionStatus[] = [RaceSessionStatus.LOCKED, RaceSessionStatus.LOCK_PENDING, RaceSessionStatus.UNDER_REVIEW];
+const checkInLocked = () => new AppError(403, ERROR_CODES.SESSION_LOCKED, "Check-in paused because the session was locked. A volunteer must authorize your resume.");
 
 function getSessionKey(userId: string, contestId: string): string {
   return `${userId}:${contestId}`;
@@ -103,17 +107,18 @@ export class SessionRepository {
       const updated = await prisma.session.updateMany({
         where: {
           userId, contestId,
-          status: { notIn: [RaceSessionStatus.LOCKED, RaceSessionStatus.LOCK_PENDING, RaceSessionStatus.UNDER_REVIEW] }
+          status: { notIn: lockedStatuses }
         },
         data: { ...data, revision: { increment: 1 }, lastSeenAt: new Date() }
       });
       if (updated.count !== 1) {
-        throw new Error("Check-in blocked: session became locked. Volunteer review is required.");
+        throw checkInLocked();
       }
       return await prisma.session.findUniqueOrThrow({ where: { userId_contestId: { userId, contestId } } });
     } catch (databaseError) {
-      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
+      if (databaseError instanceof AppError || env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const session = await this.findOrCreate(userId, contestId);
+      if (lockedStatuses.includes(session.status)) throw checkInLocked();
       session.rulesAccepted = data.rulesAccepted;
       session.cameraPermission = data.cameraPermission;
       session.fullscreenRequested = data.fullscreenRequested;

@@ -16,14 +16,11 @@ export class TokenRepository {
     inMemoryRevokedTokens.add(token);
 
     try {
-      await prisma.revokedToken.create({
-        data: {
-          token,
-          expiresAt
-        }
+      await prisma.revokedToken.upsert({
+        where: { token }, create: { token, expiresAt }, update: {}
       });
     } catch (error) {
-      if (env.NODE_ENV === "production") throw error;
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
     }
   }
 
@@ -44,7 +41,7 @@ export class TokenRepository {
         return true;
       }
     } catch (error) {
-      if (env.NODE_ENV === "production") throw error;
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
     }
 
     return false;

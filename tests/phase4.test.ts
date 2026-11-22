@@ -3,6 +3,7 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
 import { assertIsolatedDatabase } from "./isolation.js";
 import { prisma } from "../src/config/database.js";
 import { SEED_DATA } from "../src/data/seed-data.js";
@@ -11,6 +12,7 @@ import { AddressInfo } from "net";
 
 interface HttpResponse {
   status: number;
+  headers: http.IncomingHttpHeaders;
   body: any;
 }
 
@@ -30,7 +32,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -59,6 +61,7 @@ function makeRequest(
           }
           resolve({
             status: res.statusCode || 500,
+            headers: res.headers,
             body: parsed
           });
         });
@@ -109,7 +112,7 @@ async function runTests() {
       driverId: "CGP_045",
       password: "driver123"
     });
-    const token = loginRes.body.token;
+    const token = authCookie(loginRes.headers["set-cookie"]);
 
     // 2. Perform Pre-Race Check-in
     await makeRequest(
@@ -340,7 +343,7 @@ if data:
         language: "javascript",
         sourceCode: `console.log("test");`
       },
-      uncheckedLogin.body.token
+      authCookie(uncheckedLogin.headers["set-cookie"])
     );
 
     assert(

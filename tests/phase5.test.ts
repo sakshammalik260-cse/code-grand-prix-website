@@ -3,6 +3,7 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
 import { assertIsolatedDatabase } from "./isolation.js";
 import { prisma } from "../src/config/database.js";
 import { createApp } from "../src/app.js";
@@ -10,6 +11,7 @@ import { AddressInfo } from "net";
 
 interface HttpResponse {
   status: number;
+  headers: http.IncomingHttpHeaders;
   body: any;
 }
 
@@ -29,7 +31,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -58,6 +60,7 @@ function makeRequest(
           }
           resolve({
             status: res.statusCode || 500,
+            headers: res.headers,
             body: parsed
           });
         });
@@ -108,21 +111,21 @@ async function runTests() {
       driverId: "CGP2026",
       password: "Race2026!"
     });
-    const candidateToken = candidateLogin.body.token;
+    const candidateToken = authCookie(candidateLogin.headers["set-cookie"]);
 
     // 2. Authenticate Volunteer
     const volunteerLogin = await makeRequest(server, "POST", "/api/auth/login", {
       driverId: "VOLUNTEER2026",
       password: "Marshal2026!"
     });
-    const volunteerToken = volunteerLogin.body.token;
+    const volunteerToken = authCookie(volunteerLogin.headers["set-cookie"]);
 
     // 3. Authenticate Admin
     const adminLogin = await makeRequest(server, "POST", "/api/auth/login", {
       driverId: "ADMIN2026",
       password: "Control2026!"
     });
-    const adminToken = adminLogin.body.token;
+    const adminToken = authCookie(adminLogin.headers["set-cookie"]);
 
     // Checkin Candidate
     await makeRequest(
@@ -350,7 +353,7 @@ async function runTests() {
     );
 
     // Test 4.2: Public Leaderboard
-    const leaderboardRes = await makeRequest(server, "GET", "/api/leaderboard");
+    const leaderboardRes = await makeRequest(server, "GET", "/api/leaderboard", undefined, candidateToken);
     assert(
       leaderboardRes.status === 200 &&
         leaderboardRes.body.visible === true &&

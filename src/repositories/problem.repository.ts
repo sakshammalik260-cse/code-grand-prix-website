@@ -4,7 +4,7 @@
 
 import { visibleProblem } from "../services/round.service.js";
 import { prisma } from "../config/database.js";
-import { Difficulty, ProblemStatus } from "@prisma/client";
+import { Difficulty, ProblemStatus, type Prisma } from "@prisma/client";
 import { env } from "../config/env.js";
 
 export type FrontendDifficulty = "Easy" | "Medium" | "Hard";
@@ -84,8 +84,20 @@ function toStringArray(val: string | string[]): string[] {
 export class ProblemRepository {
   /** Internal scoring lookup. Never send database IDs to candidate-facing problem DTOs. */
   static async findAllScoring(): Promise<Array<{id: string; slug: string; points: number}>> {
+    const now = new Date();
     return prisma.problem.findMany({
-      where: { contestId: env.CONTEST_ID, OR: [visibleProblem(), { submissions: { some: {} } }] },
+      where: {
+        contestId: env.CONTEST_ID,
+        OR: [
+          { submissions: { some: {} } },
+          {
+            contest: { startsAt: { lte: now } },
+            round: { startsAt: { lte: now }, questionsVisible: true,
+              status: { in: ["LIVE", "PAUSED", "PAUSED_BY_ORGANIZER", "FINISHED", "ENDED"] } },
+            OR: [{ status: "PUBLISHED" }, { status: "SCHEDULED", publishAt: { lte: now } }]
+          }
+        ]
+      },
       select: { id: true, slug: true, points: true }
     });
   }
@@ -110,17 +122,13 @@ export class ProblemRepository {
    * Strictly public fields only, matching Page 14 DTO.
    */
   static async findByIdPublic(idOrSlug: string): Promise<CandidateFullProblem | null> {
-    const problem = await prisma.problem.findFirst({
-      where: {
-        AND: [visibleProblem(), { OR: [{ id: idOrSlug }, { slug: idOrSlug }] }]
-      },
-      include: {
-        testCases: {
-          where: { isPublic: true },
-          orderBy: { order: "asc" }
-        }
-      }
-    });
+    const where = visibleProblem();
+    const include = {
+      testCases: { where: { isPublic: true }, orderBy: { order: "asc" } }
+    } satisfies Prisma.ProblemInclude;
+    // Candidates use slugs. Preserve legacy ID lookups without shadowing a slug.
+    const problem = await prisma.problem.findUnique({ where: { slug: idOrSlug, AND: [where] }, include })
+      ?? await prisma.problem.findUnique({ where: { id: idOrSlug, AND: [where] }, include });
 
     if (problem) {
       return {
@@ -159,16 +167,13 @@ export class ProblemRepository {
     idOrSlug: string,
     requirePublished: boolean = true
   ): Promise<InternalProblemWithTests | null> {
-    const problem = await prisma.problem.findFirst({
-      where: {
-        AND: [requirePublished ? visibleProblem() : { contestId: env.CONTEST_ID }, { OR: [{ id: idOrSlug }, { slug: idOrSlug }] }]
-      },
-      include: {
-        testCases: {
-          orderBy: { order: "asc" }
-        }
-      }
-    });
+    const where = requirePublished ? visibleProblem() : { contestId: env.CONTEST_ID };
+    const include = {
+      testCases: { orderBy: { order: "asc" } }
+    } satisfies Prisma.ProblemInclude;
+    // Candidates use slugs. Preserve legacy ID lookups without shadowing a slug.
+    const problem = await prisma.problem.findUnique({ where: { slug: idOrSlug, AND: [where] }, include })
+      ?? await prisma.problem.findUnique({ where: { id: idOrSlug, AND: [where] }, include });
 
     if (problem) {
       return {

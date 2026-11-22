@@ -6,17 +6,19 @@ import http from "http";
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
+import { JudgeService } from "./judge/judge.service.js";
 
 async function bootstrap() {
   console.log("🏎️ Starting Code Grand Prix 2026 Backend Engine...");
 
+  if (env.NODE_ENV === "production") JudgeService.validateConfiguration();
   const app = createApp();
   const server = http.createServer(app);
 
   // Attempt database connection (non-fatal if DB is offline during initial local setup)
   await connectDatabase();
 
-  const bindAddress = env.JUDGE_PROVIDER === "local" ? "127.0.0.1" : undefined;
+  const bindAddress = env.JUDGE_PROVIDER === "local" ? "127.0.0.1" : env.CGP_BIND_ADDRESS;
   server.listen({ port: env.PORT, host: bindAddress }, () => {
     console.log(`====================================================`);
     console.log(`🏁 Code Grand Prix Backend is LIVE`);

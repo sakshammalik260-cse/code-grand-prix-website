@@ -9,8 +9,8 @@ import { Role } from "@prisma/client";
 
 export const leaderboardRouter = Router();
 
-leaderboardRouter.get("/leaderboard", LeaderboardController.getLeaderboard);
-leaderboardRouter.get("/contest/progress", requireAuth, LeaderboardController.getProgress);
+leaderboardRouter.get("/leaderboard", requireAuth, LeaderboardController.getLeaderboard);
+leaderboardRouter.get("/contest/progress", requireAuth, requireRole([Role.CANDIDATE, Role.PARTICIPANT]), LeaderboardController.getProgress);
 leaderboardRouter.get("/contest/results/visibility", LeaderboardController.getVisibility);
 
 leaderboardRouter.get(

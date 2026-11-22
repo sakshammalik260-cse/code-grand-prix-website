@@ -1,0 +1,23 @@
+{
+	admin off
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+}
+
+https://{$CGP_WEB_HOST} {
+	bind {$CGP_LAN_IP}
+	tls "{$CGP_TLS_CERT}" "{$CGP_TLS_KEY}"
+
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy 127.0.0.1:4000
+	}
+
+	handle {
+		root * "{$CGP_WEB_ROOT}"
+		try_files {path} /index.html
+		file_server
+	}
+}

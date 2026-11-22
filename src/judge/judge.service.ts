@@ -8,7 +8,9 @@ import { VERDICTS, VerdictType, ERROR_CODES } from "../constants/index.js";
 import { AppError } from "../middleware/error.middleware.js";
 import { IJudgeAdapter } from "./judge.interface.js";
 import { LocalSandboxJudge } from "./local.sandbox.js";
-import { Judge0Adapter, JudgeUnavailable } from "./judge0.adapter.js";
+import { Judge0Adapter } from "./judge0.adapter.js";
+import { PistonAdapter } from "./piston.adapter.js";
+import { JudgeUnavailable } from "./judge-transport.js";
 import { ProblemRepository } from "../repositories/problem.repository.js";
 import { SubmissionRepository } from "../repositories/submission.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
@@ -88,22 +90,28 @@ function validateCases(cases: { input: string; expectedOutput: string }[]) {
 export class JudgeService {
   private static adapter: IJudgeAdapter;
 
+  static validateConfiguration(): void {
+    this.getAdapter();
+  }
+
   private static getAdapter(): IJudgeAdapter {
     // C01 Fix: Disable unhardened local runner in production
     if (env.NODE_ENV === "production" && env.JUDGE_PROVIDER === "local") {
       throw new AppError(
         500,
         ERROR_CODES.INTERNAL_SERVER_ERROR,
-        "C01 Refusal: Local code execution adapter is disabled in production. Set JUDGE_PROVIDER=judge0."
+        "C01 Refusal: Local code execution adapter is disabled in production. Select an isolated judge provider."
       );
     }
 
-    if (env.JUDGE_PROVIDER === "local" && env.NODE_ENV !== "test" && !env.ALLOW_TRUSTED_LOCAL_JUDGE) {
+    if (env.JUDGE_PROVIDER === "local" && env.NODE_ENV !== "test") {
       throw new JudgeUnavailable("trusted-local-disabled");
     }
     if (!this.adapter) {
       if (env.JUDGE_PROVIDER === "judge0") {
         this.adapter = new Judge0Adapter();
+      } else if (env.JUDGE_PROVIDER === "piston") {
+        this.adapter = new PistonAdapter();
       } else {
         this.adapter = new LocalSandboxJudge();
       }
@@ -461,11 +469,10 @@ export class JudgeService {
       );
     }
 
-    const roleUpper = userRole.toUpperCase();
-    const isStaff = roleUpper === "ADMIN" || roleUpper === "VOLUNTEER";
+    const mayReview = userRole === "ADMIN" ||
+      (userRole === "VOLUNTEER" && (await RoundService.clock()).resultsVisible);
 
-    // C03 Fix: Candidate role is CANDIDATE or PARTICIPANT
-    if (!isStaff && submission.userId !== userId) {
+    if (!mayReview && submission.userId !== userId) {
       throw new AppError(
         403,
         ERROR_CODES.FORBIDDEN_ROLE,

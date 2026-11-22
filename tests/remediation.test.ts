@@ -3,6 +3,7 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
 import { assertIsolatedDatabase } from "./isolation.js";
 import { prisma } from "../src/config/database.js";
 import { createApp } from "../src/app.js";
@@ -11,6 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 
 interface HttpResponse {
   status: number;
+  headers: http.IncomingHttpHeaders;
   body: any;
 }
 
@@ -30,7 +32,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -59,6 +61,7 @@ function makeRequest(
           }
           resolve({
             status: res.statusCode || 500,
+            headers: res.headers,
             body: parsed
           });
         });
@@ -109,7 +112,7 @@ async function runRemediationTests() {
       driverId: "CGP2026",
       password: "Race2026!"
     });
-    const driverToken = driverRes.body.token;
+    const driverToken = authCookie(driverRes.headers["set-cookie"]);
     assert(driverRes.status === 200, "Driver CGP2026 logged in");
     assert(driverRes.body.user.role === "CANDIDATE", "User has role CANDIDATE");
 
@@ -117,14 +120,14 @@ async function runRemediationTests() {
       driverId: "VOLUNTEER2026",
       password: "Marshal2026!"
     });
-    const volToken = volRes.body.token;
+    const volToken = authCookie(volRes.headers["set-cookie"]);
     assert(volRes.status === 200, "Volunteer VOLUNTEER2026 logged in");
 
     const adminRes = await makeRequest(server, "POST", "/api/auth/login", {
       driverId: "ADMIN2026",
       password: "Control2026!"
     });
-    const adminToken = adminRes.body.token;
+    const adminToken = authCookie(adminRes.headers["set-cookie"]);
     assert(adminRes.status === 200, "Admin ADMIN2026 logged in");
 
     // 2. C06: Contest Clock Contract
@@ -217,7 +220,7 @@ async function runRemediationTests() {
       driverId: "CGP_045",
       password: "driver123"
     });
-    const driver2Token = driver2Res.body.token;
+    const driver2Token = authCookie(driver2Res.headers["set-cookie"]);
     const crossAccessRes = await makeRequest(
       server,
       "GET",

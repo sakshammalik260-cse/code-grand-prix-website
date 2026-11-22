@@ -19,22 +19,22 @@ export class VolunteerService {
   /**
    * List participants with live competition session status, score, and lock details
    */
-  static async listParticipants() {
+  static async listParticipants(role: Role) {
     const participants = await UserRepository.findAllParticipants();
-    const standings = await LeaderboardService.getLeaderboard("VOLUNTEER");
+    const standings = await LeaderboardService.getLeaderboard(role);
     const scoreByDriver = new Map(standings.rows.map(row => [row.driverId, row.totalScore]));
     const result = [];
 
     for (const p of participants) {
       const { session, lockReason, lastSeenAt, cameraStatus, lockCount } = await CheckinService.getSession(p.id, env.CONTEST_ID);
-      const score = scoreByDriver.get(p.driverId) || 0;
+      const score = scoreByDriver.get(p.driverId);
 
       result.push({
         ...session,
         displayName: p.displayName,
         team: p.team || "CPC Grid",
         raceStatus: session.status,
-        score,
+        ...(score === undefined ? {} : { score }),
         lastSeenAt, cameraStatus, lockCount, lockReason
       });
     }
