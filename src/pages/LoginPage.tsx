@@ -39,7 +39,11 @@ export function LoginPage() {
     }
     setLoading(true)
     try { const account=await authService.login({ driverId, password }); const from=(location.state as {from?:string})?.from; const allowed=account.role==='ADMIN'?within(from,'/admin') || within(from,'/volunteer') || from==='/results':account.role==='VOLUNTEER'?within(from,'/volunteer'):from==='/check-in' || from==='/results'; const target=allowed && from?from:roleHome(account.role); setPostLoginTarget(target); signIn(account); navigate(target, { replace: true }) }
-    catch (err) { setError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.') }
+    catch (err: unknown) {
+      const res = (err as { response?: { data?: { error?: { message?: string }; message?: string } } })?.response?.data
+      const serverMsg = res?.error?.message || res?.message
+      setError(serverMsg || (err instanceof Error ? err.message : 'Unable to sign in. Please try again.'))
+    }
     finally { setLoading(false) }
   }
   return <section className="cinematic-login cinematic-page" aria-label="Driver authentication">

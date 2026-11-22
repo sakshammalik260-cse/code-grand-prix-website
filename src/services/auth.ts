@@ -14,7 +14,12 @@ export const authService = {
   async me(signal?: AbortSignal): Promise<Driver | null> {
     if (isDevelopmentMock && mock) return (await mock()).mockMe()
     try { return validateIdentity((await api.get<Driver>('/auth/me',{signal})).data) }
-    catch (error) { if ((error as { response?: { status: number } }).response?.status === 401) return null; throw error }
+    catch (error) {
+      const status = (error as { response?: { status: number } }).response?.status
+      // 401 (unauthenticated guest) or 404 (no active session / cold start) means no user session
+      if (status === 401 || status === 404) return null
+      throw error
+    }
   },
   async logout() { if (!isDevelopmentMock) await api.post('/auth/logout'); else if(mock) (await mock()).mockLogout() },
 }
