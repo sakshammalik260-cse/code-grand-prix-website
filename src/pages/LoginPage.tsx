@@ -6,7 +6,7 @@ import { authService } from '../services/auth'
 import { isDevelopmentMock } from '../services/mode'
 import { roleHome } from '../services/access'
 import { useSession } from '../hooks/useSession'
-import { CheckeredFlag, RaceWordmark } from '../components/RacingIdentity'
+import { RaceWordmark } from '../components/RacingIdentity'
 import { LoadingState } from '../components/Ui'
 
 const DevelopmentAccounts = import.meta.env.DEV ? lazy(()=>import('../components/DevelopmentAccounts')) : null
@@ -48,7 +48,6 @@ export function LoginPage() {
   }
   return <section className="cinematic-login cinematic-page" aria-label="Driver authentication">
     <div className="helmet-portrait" role="img" aria-label="Racing driver wearing a black and red helmet under dramatic red lighting" />
-    <CheckeredFlag className="login-flag" />
     <div className="login-speed-lines" aria-hidden="true" />
     <div className="driver-login-layout">
       <section className="driver-login-panel" aria-labelledby="driver-login-title">

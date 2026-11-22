@@ -35,6 +35,14 @@
 @media(prefers-reduced-motion:reduce){.cinematic-shell .racing-button:hover:not(:disabled){transform:skew(-13deg)}}
 /* Corrections from the first desktop comparison pass. */
 .login-shell .header-wordmark{visibility:hidden;pointer-events:none}.login-shell .nav-cta{display:none}
+.login-shell .race-header,
+.login-shell .site-header,
+.cinematic-shell .race-header,
+.cinematic-shell .site-header {
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
 .title-speed-lines{font-size:0;letter-spacing:0;display:inline-block;vertical-align:0;width:53px;height:27px;margin-right:20px;transform:skew(-22deg);background:repeating-linear-gradient(90deg,#b5151d 0 9px,transparent 9px 17px)}
 .race-countdown-panel .time-unit strong{font-family:Bahnschrift,'Arial Narrow',Consolas,monospace;font-size:43px;font-weight:600;font-style:normal;letter-spacing:0;font-variant-numeric:tabular-nums}
 .lobby-race-countdown .time-unit strong{font-size:48px}

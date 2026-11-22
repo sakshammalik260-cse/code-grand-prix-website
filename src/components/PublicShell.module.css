@@ -26,6 +26,15 @@
   box-shadow: 0 10px 28px rgb(0 0 0 / 26%);
 }
 
+:global(.login-shell) .header,
+:global(.login-shell) .header.scrolled,
+:global(.entry-shell) .header,
+:global(.cinematic-shell) .header {
+  border-bottom: none !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+}
+
 .navShell {
   width: min(84rem, calc(100% - max(2.5rem, 7vw)));
   height: 100%;
