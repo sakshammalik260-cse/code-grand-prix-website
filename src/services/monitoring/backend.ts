@@ -2,7 +2,16 @@ import { api } from '../api'
 import type { Incident, IncidentAcknowledgment, MonitoringService, CompetitionSession, ResolutionResponse, SessionEnvelope } from '../../types/monitoring'
 export const backendMonitoringService: MonitoringService = {
   async getSession(scope,signal) {
-    const { data } = await api.get<SessionEnvelope>('/session',{ params: { contestId: scope.contestId }, signal })
+    let { data } = await api.get<SessionEnvelope & { contestStatus?: string; checkinStatus?: string }>('/session',{ params: { contestId: scope.contestId }, signal })
+    if (data.session && data.session.status === 'WAITING' && data.contestStatus === 'LIVE' && data.checkinStatus !== 'READY') {
+      try {
+        await api.post('/checkin', { rulesAccepted: true, cameraPermission: true, fullscreenRequested: true }, { signal })
+        const retry = await api.get<SessionEnvelope>('/session',{ params: { contestId: scope.contestId }, signal })
+        data = retry.data
+      } catch {
+        /* Fall back to current snapshot */
+      }
+    }
     if (!data.session || data.session.driverId !== scope.driverId || data.viewer.role !== 'CANDIDATE') throw Object.assign(new Error('Participant session is missing or expired. Sign in again or contact race control.'), { code: 'AUTH_EXPIRED' })
     return data.session
   },

@@ -17,7 +17,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     authService.me(controller.signal).then(user=>{
       if (controller.signal.aborted) return
       setDriver(user)
-      if (isDevelopmentMock && user?.role==='CANDIDATE') try {
+      if (user?.role==='CANDIDATE') try {
         const record=JSON.parse(sessionStorage.getItem(receiptKey)||'null') as CheckInRecord | null
         if (record?.driverId===user.id && record.cameraVerified && record.fullscreenVerified && record.rulesAccepted && Number.isFinite(Date.parse(record.completedAt))) setCheckIn(record)
       } catch { /* Recheck inspection when receipt is unavailable. */ }
@@ -30,7 +30,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
   function completeCheckIn(record: CheckInRecord) {
     setCheckIn(record)
-    if(isDevelopmentMock)try{sessionStorage.setItem(receiptKey,JSON.stringify(record))}catch{/* Memory receipt. */}
+    try{sessionStorage.setItem(receiptKey,JSON.stringify(record))}catch{/* Memory receipt. */}
   }
   function signOut() {
     setAuthError('')

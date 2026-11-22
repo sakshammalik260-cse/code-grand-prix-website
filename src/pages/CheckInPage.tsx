@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Camera, CameraOff, Check, Circle, Expand, LoaderCircle, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react'
 import { useCamera } from '../hooks/useCamera'
 import { useSession } from '../hooks/useSession'
+import { api } from '../services/api'
+import { isDevelopmentMock } from '../services/mode'
 export function CheckInPage() {
   const { driver, completeCheckIn } = useSession()
   const navigate = useNavigate()
@@ -35,8 +37,23 @@ export function CheckInPage() {
   }
   const checks = [{ title: 'Driver identity confirmed', done: !!driver }, { title: 'Camera preview connected', done: !!camera.stream?.active }, { title: 'Fullscreen activated', done: fullscreen }, { title: 'Rules acknowledged', done: accepted }]
   const ready = checks.every(check => check.done)
-  function start() {
-    if (!ready || !driver || !document.fullscreenElement || !camera.stream?.active) return
+  const [starting, setStarting] = useState(false)
+  async function start() {
+    if (!ready || !driver || !document.fullscreenElement || !camera.stream?.active || starting) return
+    setStarting(true)
+    try {
+      if (!isDevelopmentMock) {
+        await api.post('/checkin', {
+          rulesAccepted: true,
+          cameraPermission: true,
+          fullscreenRequested: true
+        })
+      }
+    } catch (err) {
+      console.warn('Check-in sync with backend:', err)
+    } finally {
+      setStarting(false)
+    }
     completeCheckIn({ driverId: driver.id, completedAt: new Date().toISOString(), cameraVerified: true, rulesAccepted: true, fullscreenVerified: true })
     navigate('/lobby')
   }

@@ -7,6 +7,7 @@ const locked={...base,status:'LOCKED',revision:2,latestIncident:incident,policy:
 const receipt={id:'approval-1',incidentId:'incident-1',decision:'AUTHORIZE_RESUME',actorId:'volunteer',actorRole:'VOLUNTEER',decidedAt:'2026-11-17T10:01:00Z',simulation:true}
 const approved={...base,status:'RESUME_AUTHORIZED',revision:3,latestIncident:incident,resumeAuthorization:receipt}
 assert.equal(canAcceptSession(null,base,scope),true)
+assert.equal(canAcceptSession(null,{...base,status:'WAITING'},scope),true)
 assert.equal(canAcceptSession(base,{...base,driverId:'other',revision:2},scope),false)
 assert.equal(canAcceptSession(base,{...base,id:'different',revision:2},scope),false)
 assert.equal(canAcceptSession(locked,{...base,revision:1},scope),false)
@@ -26,5 +27,6 @@ assert.equal(canAcceptSession(approved,relocked,scope),true)
 assert.equal(sessionAllowsExecution(base),true)
 assert.equal(sessionAllowsExecution(approved),true)
 assert.equal(sessionAllowsExecution(locked),false)
+assert.equal(sessionAllowsExecution({...base,status:'WAITING'}),false)
 assert.equal(sessionAllowsExecution({...base,status:'FINISHED'}),false)
 console.log('PASS a new incident can re-lock; execution is gated by confirmed session state and policy')

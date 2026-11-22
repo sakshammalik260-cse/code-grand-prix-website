@@ -2,7 +2,7 @@ import type { CompetitionSession, ParticipantScope } from '../../types/monitorin
 export function isSessionSnapshot(value: unknown): value is CompetitionSession {
   if (!value || typeof value !== 'object') return false
   const item = value as Partial<CompetitionSession>
-  if (typeof item.id !== 'string' || typeof item.contestId !== 'string' || typeof item.driverId !== 'string' || !Number.isInteger(item.revision) || (item.revision || 0) < 1 || !['ACTIVE','LOCK_PENDING','LOCKED','UNDER_REVIEW','RESUME_AUTHORIZED','FINISHED'].includes(item.status || '')) return false
+  if (typeof item.id !== 'string' || typeof item.contestId !== 'string' || typeof item.driverId !== 'string' || !Number.isInteger(item.revision) || (item.revision || 0) < 1 || !['WAITING','ACTIVE','LOCK_PENDING','LOCKED','UNDER_REVIEW','RESUME_AUTHORIZED','FINISHED'].includes(item.status || '')) return false
   if (!item.policy || ['allowExecution','allowEditing','allowNavigation'].some(field => typeof item.policy![field as keyof typeof item.policy] !== 'boolean')) return false
   if (!Number.isFinite(Date.parse(item.serverTime || '')) || !Number.isFinite(Date.parse(item.updatedAt || ''))) return false
   if (item.latestIncident === undefined || item.resumeAuthorization === undefined) return false

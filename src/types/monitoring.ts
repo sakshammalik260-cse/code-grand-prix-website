@@ -1,5 +1,5 @@
 export type IncidentType = 'TAB_HIDDEN' | 'WINDOW_FOCUS_LOST' | 'FULLSCREEN_EXIT' | 'CAMERA_INTERRUPTED'
-export type SessionStatus = 'ACTIVE' | 'LOCK_PENDING' | 'LOCKED' | 'UNDER_REVIEW' | 'RESUME_AUTHORIZED' | 'FINISHED'
+export type SessionStatus = 'WAITING' | 'ACTIVE' | 'LOCK_PENDING' | 'LOCKED' | 'UNDER_REVIEW' | 'RESUME_AUTHORIZED' | 'FINISHED'
 export type CameraStatus = 'ACTIVE' | 'INTERRUPTED' | 'PERMISSION_REQUIRED' | 'UNAVAILABLE'
 export type ReviewStatus = 'OPEN' | 'AUTHORIZED' | 'KEPT_LOCKED' | 'ESCALATED'
 export type ResolutionDecision = 'AUTHORIZE_RESUME' | 'KEEP_LOCKED' | 'ESCALATE'
