@@ -10,6 +10,7 @@ export interface JudgeExecutionRequest {
   stdin: string;
   timeLimitMs: number;
   memoryLimitMb: number;
+  signal?: AbortSignal;
 }
 
 export interface JudgeExecutionResult {

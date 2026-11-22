@@ -24,10 +24,11 @@ export class ContestRepository {
         where: { id }
       });
       if (contest) return contest;
-    } catch {
-      if (env.NODE_ENV === "production" && !env.ALLOW_DEV_FALLBACK) {
-        throw new Error("Database unavailable while fetching contest state.");
-      }
+    } catch (error) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
+    }
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) {
+      throw new Error("Contest configuration missing. Refusing to synthesize live contest status.");
     }
     return defaultContest;
   }
@@ -44,13 +45,12 @@ export class ContestRepository {
 
     let status: "WAITING" | "LIVE" | "PAUSED_BY_ORGANIZER" | "FINISHED";
 
-    // C06 Fix: Authoritative schedule check
-    if (contest.status === ContestStatus.PAUSED || contest.status === ContestStatus.PAUSED_BY_ORGANIZER) {
-      status = "PAUSED_BY_ORGANIZER";
-    } else if (nowTime < startTime) {
-      status = "WAITING";
-    } else if (nowTime >= endTime) {
+    if (contest.status === ContestStatus.ENDED || contest.status === ContestStatus.FINISHED || nowTime >= endTime) {
       status = "FINISHED";
+    } else if (contest.status === ContestStatus.UPCOMING || contest.status === ContestStatus.WAITING || nowTime < startTime) {
+      status = "WAITING";
+    } else if (contest.status === ContestStatus.PAUSED || contest.status === ContestStatus.PAUSED_BY_ORGANIZER) {
+      status = "PAUSED_BY_ORGANIZER";
     } else {
       status = "LIVE";
     }

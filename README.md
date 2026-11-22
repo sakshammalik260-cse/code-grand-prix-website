@@ -83,7 +83,7 @@ The backend uses **Prisma ORM** with PostgreSQL.
    npx prisma studio
    ```
 
-*(Note: If a remote database is not connected during local testing, the backend seamlessly uses an in-memory repository fallback preloaded with all competition data).*
+The API uses PostgreSQL by default. An explicit `ALLOW_DEV_FALLBACK=true` enables limited demo-only fallbacks for local development.
 
 ---
 
@@ -106,7 +106,7 @@ Code execution is isolated via the **Modular Judge Adapter** pattern:
 Base URL: `http://localhost:4000/api`
 
 ### 1. Authentication & Sessions
-- `POST /api/auth/login`: Authenticates driverId & password; issues HttpOnly cookie and JWT token.
+- `POST /api/auth/login` authenticates the driver ID and password, returns the profile, and sets the HttpOnly `auth_token` cookie. Existing bearer tokens remain accepted until revoked or expired. Clients that read a token from the JSON response must use the cookie jar for future logins. The Postman collection uses its cookie jar, so sign in as the role required for each request.
 - `GET /api/auth/me`: Returns profile of authenticated user.
 - `POST /api/auth/logout`: Revokes token immediately and clears cookie.
 - `POST /api/checkin`: Pre-race check-in (rules, camera, fullscreen).
@@ -127,7 +127,7 @@ Base URL: `http://localhost:4000/api`
 - `POST /api/violations`: Ingests client browser signals (`TAB_HIDDEN`, `FULLSCREEN_EXIT`, `WINDOW_FOCUS_LOST`).
   - Critical events trigger immediate session `LOCK`.
   - Deduplicated by `clientEventId`.
-- `GET /api/volunteer/participants`: Lists live participant statuses, lock counts, and scores.
+- `GET /api/volunteer/participants` lists live participant statuses and lock counts. Admins can see scores. Volunteer responses include scores when standings are released.
 - `GET /api/volunteer/incidents`: Lists reported violation alerts.
 - `POST /api/volunteer/sessions/:id/authorize-resume`: **One-Action Bulk Session Recovery** — atomically resolves all open incidents for the session and restores status to `ACTIVE`.
 
@@ -136,13 +136,13 @@ Base URL: `http://localhost:4000/api`
 - `POST /api/contest/problems/:id/hints/:hintId/unlock`: Unlocks hint, reveals text, and deducts penalty points (idempotent; no double deductions).
 
 ### 6. Leaderboard & Results
-- `GET /api/leaderboard`: Authoritative server-ranked standings.
+- `GET /api/leaderboard` requires authentication. It returns official standings to admins and released standings to candidates and volunteers.
 - `GET /api/contest/progress`: Candidate personal score and solved problem IDs.
 - `GET /api/contest/results/visibility`: Check if standings are visible to candidates.
 - `POST /api/admin/results/visibility`: Admin toggle to show/hide leaderboard.
 
 ### 7. Admin Question Management
-- `GET /api/admin/overview`: Contest health and entity counts.
+- `GET /api/admin/overview` includes numeric `activeRoundCount` and the detailed `activeRounds` array.
 - `GET /api/admin/problems`: All problems including drafts.
 - `POST /api/admin/problems`: Create custom problem draft.
 - `POST /api/admin/problems/:id/publish`: Publish problem for candidates.
@@ -152,7 +152,7 @@ Base URL: `http://localhost:4000/api`
 
 ## 🧪 Postman Collection
 
-Import [`docs/code-grand-prix-postman.json`](file:///Users/sneha/Documents/Code%20Grand%20Prix/docs/code-grand-prix-postman.json) into Postman for pre-configured requests with variables and sample payloads.
+Import [the API collection](docs/code-grand-prix-postman.json) into Postman for sample requests and login payloads.
 
 ---
 
@@ -165,4 +165,13 @@ Import [`docs/code-grand-prix-postman.json`](file:///Users/sneha/Documents/Code%
    - `DATABASE_URL`: Supabase connection string.
    - `JWT_SECRET`: Secure random string.
    - `ALLOWED_ORIGINS`: Frontend URL (e.g. `https://your-frontend.vercel.app`).
-   - `COOKIE_SECURE`: `true`.
+   - `COOKIE_SECURE=true` and `COOKIE_SAME_SITE=lax` for same-origin HTTPS. Use independent strong values for `JWT_SECRET` and `COOKIE_SECRET`.
+   - Set `NODE_ENV=production`, `API_BASE_URL` to the public HTTPS origin, and `ALLOW_DEV_FALLBACK=false`.
+   - Set `TRUST_PROXY` to the reverse proxy's exact IP addresses or CIDRs. Restrict direct access to Express and configure the proxy to replace forwarded client IP and protocol headers.
+   - Use a shared PostgreSQL database and schema across API replicas. Apply reviewed migrations with `prisma migrate deploy` before sending traffic to the API.
+   - Set `JUDGE_PROVIDER` to the approved Judge0 or Piston endpoint and provide its configuration through backend secrets.
+   - Serve the production frontend in API mode. Prefer the same HTTPS origin with `/api` forwarded to Express.
+
+### Login limits
+
+Successful logins release their in-flight reservations. Failed attempts count for 15 minutes against a driver-and-source limit of 8, a driver limit of 20 across sources, and the configurable `LOGIN_SOURCE_LIMIT` of 250 by default. IPv6 source accounting uses a /64. Production instances share limits in PostgreSQL. Use the same signing secret across replicas so they derive the same bucket keys.

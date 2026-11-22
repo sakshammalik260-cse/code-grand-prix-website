@@ -23,10 +23,14 @@ if (env.NODE_ENV !== "production") {
 export async function connectDatabase(): Promise<boolean> {
   try {
     await prisma.$connect();
+    if (env.NODE_ENV === "production") {
+      await prisma.$queryRaw`SELECT "key" FROM "login_rate_buckets" LIMIT 0`;
+    }
     console.log("✅ Successfully connected to PostgreSQL database via Prisma.");
     return true;
   } catch (error) {
     console.error("❌ Failed to connect to PostgreSQL database:", error);
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
     return false;
   }
 }

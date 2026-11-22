@@ -1,0 +1,73 @@
+name: cgp-judge0
+x-judge: &judge
+  image: judge0/judge0:1.13.1
+  env_file: [.judge0.env]
+  restart: "no"
+  logging:
+    driver: local
+    options:
+      max-size: "10m"
+      max-file: "2"
+
+services:
+  api:
+    <<: *judge
+    ports: ["127.0.0.1:2358:2358"]
+    networks: [private, ingress]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command:
+      - bash
+      - -ec
+      - |
+        sudo sed -i 's/config.log_level = :debug/config.log_level = :warn/' config/environments/production.rb
+        source ./scripts/load-config
+        sudo install -m 0600 /dev/null /api/environment
+        export | sudo tee /api/environment >/dev/null
+        rails db:migrate db:seed
+        exec rails s -b 0.0.0.0
+  worker:
+    <<: *judge
+    # Upstream Isolate needs privileges. Launch only on a dedicated Linux judge VM.
+    privileged: true
+    networks: [private]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    command:
+      - bash
+      - -ec
+      - |
+        sudo sed -i 's/config.log_level = :debug/config.log_level = :warn/' config/environments/production.rb
+        source ./scripts/load-config
+        sudo install -m 0600 /dev/null /api/environment
+        export | sudo tee /api/environment >/dev/null
+        exec rails resque:workers
+  db:
+    image: postgres:16
+    env_file: [.judge0.env]
+    networks: [private]
+    volumes: [db-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  redis:
+    image: redis:7.2
+    env_file: [.judge0.env]
+    networks: [private]
+    command: ["sh", "-ec", "exec redis-server --appendonly no --requirepass \"$$REDIS_PASSWORD\""]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -qx PONG"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+networks:
+  private:
+    internal: true
+  ingress: {}
+volumes:
+  db-data: {}

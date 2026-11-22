@@ -5,11 +5,46 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { spawn } from "child_process";
+import { execFile, spawn } from "child_process";
+import { promisify } from "node:util";
 import { IJudgeAdapter, JudgeExecutionRequest, JudgeExecutionResult } from "./judge.interface.js";
 import { VERDICTS } from "../constants/index.js";
 
 const MAX_OUTPUT_BYTES = 65536; // 64 KB cap
+
+const execFileAsync = promisify(execFile);
+
+async function findPython(): Promise<string> {
+  if (process.platform !== "win32") return "python3";
+
+  // Enumerate installed runtimes without invoking a Python install alias.
+  const candidates: string[] = [];
+  try {
+    const { stdout } = await execFileAsync("py", ["-0p"], {
+      timeout: 3000,
+      windowsHide: true
+    });
+    for (const line of stdout.split(/\r?\n/)) {
+      const match = line.match(/^\s*-(?:V:)?(?:PythonCore\/)?3(?:[.\d-]*)\s+(\*\s+)?([A-Za-z]:\\.+\.exe)\s*$/i);
+      if (!match) continue;
+      if (match[1]) candidates.unshift(match[2].trim());
+      else candidates.push(match[2].trim());
+    }
+  } catch {
+    // Python may be installed directly without the launcher.
+  }
+
+  for (const directory of (process.env.PATH ?? "").split(path.delimiter)) {
+    const absolute = directory.replace(/^"|"$/g, "");
+    if (path.isAbsolute(absolute)) candidates.push(path.join(absolute, "python.exe"));
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.toLowerCase().split(path.sep).includes("windowsapps")) continue;
+    if ((await fs.promises.stat(candidate).catch(() => null))?.isFile()) return candidate;
+  }
+  throw new Error("No installed Python 3 interpreter found for trusted local execution.");
+}
 
 export class LocalSandboxJudge implements IJudgeAdapter {
   async execute(request: JudgeExecutionRequest): Promise<JudgeExecutionResult> {
@@ -43,7 +78,7 @@ export class LocalSandboxJudge implements IJudgeAdapter {
       case "python":
       case "python3":
         fileName = "Solution.py";
-        runCmd = "python3";
+        runCmd = await findPython();
         runArgs = [path.join(tmpDir, fileName)];
         break;
 
@@ -71,11 +106,12 @@ export class LocalSandboxJudge implements IJudgeAdapter {
         break;
 
       case "java":
-        fileName = "Solution.java";
+        const mainClass = /\bpublic\s+class\s+Main\b/.test(request.sourceCode) ? "Main" : "Solution";
+        fileName = mainClass + ".java";
         compileCmd = "javac";
         compileArgs = [path.join(tmpDir, fileName)];
         runCmd = "java";
-        runArgs = ["-Xmx256m", "-Xms64m", "-cp", tmpDir, "Solution"];
+        runArgs = ["-Xmx256m", "-Xms64m", "-cp", tmpDir, mainClass];
         break;
 
       default:
@@ -228,6 +264,10 @@ export class LocalSandboxJudge implements IJudgeAdapter {
           durationMs: Date.now() - startTime,
           timedOut
         });
+      });
+
+      child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EPIPE" && error.code !== "ERR_STREAM_DESTROYED") child.kill();
       });
 
       // Write stdin and close the stream

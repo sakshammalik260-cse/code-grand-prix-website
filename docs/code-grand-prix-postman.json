@@ -1,28 +1,13 @@
 {
   "info": {
     "name": "Code Grand Prix 2026 — Official API Collection",
-    "description": "Complete backend API test collection for Code Grand Prix 2026 F1-themed competitive coding platform.",
+    "description": "Backend API collection for Code Grand Prix 2026. Sign in with the required role before protected requests. Postman sends the HttpOnly cookie from its cookie jar.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:4000/api",
-      "type": "string"
-    },
-    {
-      "key": "candidateToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "volunteerToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "adminToken",
-      "value": "",
       "type": "string"
     }
   ],
@@ -83,7 +68,7 @@
           "name": "GET /api/auth/me",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/auth/me" }
           }
         },
@@ -91,7 +76,7 @@
           "name": "POST /api/auth/logout",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/auth/logout" }
           }
         }
@@ -105,8 +90,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -119,7 +103,7 @@
           "name": "GET /api/session",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/session" }
           }
         }
@@ -140,7 +124,7 @@
           "name": "GET /api/contest/problems",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/contest/problems" }
           }
         },
@@ -148,7 +132,7 @@
           "name": "GET /api/contest/problems/:id",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/contest/problems/speed-trap-detection" }
           }
         },
@@ -170,8 +154,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -185,8 +168,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -199,7 +181,7 @@
           "name": "GET /api/submissions/:id",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/submissions/sub_sample_id" }
           }
         }
@@ -213,8 +195,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -232,7 +213,7 @@
           "name": "GET /api/volunteer/participants",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{volunteerToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/volunteer/participants" }
           }
         },
@@ -240,7 +221,7 @@
           "name": "GET /api/volunteer/incidents",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{volunteerToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/volunteer/incidents" }
           }
         },
@@ -249,8 +230,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{volunteerToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -268,7 +248,7 @@
           "name": "GET /api/contest/problems/:id/hints",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/contest/problems/speed-trap-detection/hints" }
           }
         },
@@ -277,8 +257,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{candidateToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -304,7 +283,7 @@
           "name": "GET /api/contest/progress",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/contest/progress?contestId=cgp_2026" }
           }
         },
@@ -321,8 +300,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
@@ -340,7 +318,7 @@
           "name": "GET /api/admin/overview",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "header": [],
             "url": { "raw": "{{baseUrl}}/admin/overview" }
           }
         },
@@ -349,8 +327,7 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",

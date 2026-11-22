@@ -1,3 +1,8 @@
+import { Prisma } from "@prisma/client";
+import { AppError } from "../middleware/error.middleware.js";
+import { ERROR_CODES } from "../constants/index.js";
+import { visibleProblem } from "../services/round.service.js";
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — HINT REPOSITORY
 // ==============================================================================
@@ -5,10 +10,8 @@
 import { prisma } from "../config/database.js";
 import { SEED_DATA } from "../data/seed-data.js";
 import { Hint, HintReceipt } from "@prisma/client";
-import { v4 as uuidv4 } from "uuid";
 
 const inMemoryHints: Map<string, Hint[]> = new Map();
-const inMemoryReceipts: Map<string, HintReceipt> = new Map();
 
 // Initialize in-memory hints from SEED_DATA
 for (const p of SEED_DATA.problems) {
@@ -27,10 +30,6 @@ for (const p of SEED_DATA.problems) {
   }
 }
 
-function getReceiptKey(contestId: string, userId: string, problemId: string, hintId: string): string {
-  return `${contestId}:${userId}:${problemId}:${hintId}`;
-}
-
 export class HintRepository {
   static async getProblemHints(problemId: string, userId: string, contestId: string) {
     let hints: Hint[] = [];
@@ -39,11 +38,12 @@ export class HintRepository {
         where: { problemId },
         orderBy: { order: "asc" }
       });
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
     }
 
-    if (!hints || hints.length === 0) {
+    if (hints.length === 0 && env.NODE_ENV !== "production" && env.ALLOW_DEV_FALLBACK) {
       hints = inMemoryHints.get(problemId) || [];
     }
 
@@ -53,23 +53,17 @@ export class HintRepository {
       receipts = await prisma.hintReceipt.findMany({
         where: { userId, contestId, problemId }
       });
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
-    }
-
-    if (!receipts || receipts.length === 0) {
-      receipts = Array.from(inMemoryReceipts.values()).filter(
-        (r) => r.userId === userId && r.contestId === contestId && r.problemId === problemId
-      );
     }
 
     const purchasedHintIds = new Set(receipts.map((r) => r.hintId));
 
-    let totalHintPenalty = 0;
+    const totalHintPenalty = receipts.reduce((sum, receipt) => sum + receipt.deductionApplied, 0);
     const formattedHints = hints.map((h) => {
       const isUnlocked = purchasedHintIds.has(h.id);
       if (isUnlocked) {
-        totalHintPenalty += h.deductionPoints;
         return {
           id: h.id,
           order: h.order,
@@ -99,10 +93,12 @@ export class HintRepository {
         where: { id: hintId }
       });
       if (hint) return hint;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
     }
 
+    if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) return null;
     for (const list of inMemoryHints.values()) {
       const found = list.find((h) => h.id === hintId);
       if (found) return found;
@@ -115,54 +111,36 @@ export class HintRepository {
     contestId: string,
     problemId: string,
     hintId: string,
-    operationId: string
+    operationId: string,
+    expectedRevision: number
   ): Promise<{ hint: Hint; deductionApplied: number; replayed: boolean }> {
-    const hint = await this.findHintById(hintId);
-    if (!hint) {
-      throw new Error(`Hint '${hintId}' does not exist.`);
-    }
-
-    const receiptKey = getReceiptKey(contestId, userId, problemId, hintId);
-
-    // 1. Check existing receipt for idempotency
     try {
-      const existing = await prisma.hintReceipt.findFirst({
-        where: {
-          OR: [
-            { operationId },
-            { contestId, userId, problemId, hintId }
-          ]
+      return await prisma.$transaction(async tx => {
+        await tx.$queryRaw`SELECT id FROM problems WHERE id = ${problemId} FOR UPDATE`;
+        const available = await tx.problem.findFirst({
+          where: { AND: [visibleProblem(), { id: problemId, revision: expectedRevision }] },
+          select: { id: true }
+        });
+        if (!available) throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Question or round changed. Refresh before unlocking.");
+        const hint = await tx.hint.findFirst({ where: { id: hintId, problemId } });
+        if (!hint) throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Hint not found.");
+        const operation = await tx.hintReceipt.findUnique({ where: { operationId } });
+        if (operation && (operation.userId !== userId || operation.contestId !== contestId ||
+            operation.problemId !== problemId || operation.hintId !== hintId)) {
+          throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Operation ID belongs to a different hint purchase.");
         }
+        const purchased = operation ?? await tx.hintReceipt.findFirst({ where: { contestId, userId, problemId, hintId } });
+        if (purchased) return { hint, deductionApplied: 0, replayed: true };
+        await tx.hintReceipt.create({ data: { operationId, contestId, userId, problemId, hintId,
+          deductionApplied: hint.deductionPoints } });
+        return { hint, deductionApplied: hint.deductionPoints, replayed: false };
       });
-      if (existing) {
-        return { hint, deductionApplied: 0, replayed: true };
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Operation ID belongs to a different hint purchase.");
       }
-    } catch {
-      // In-memory check
-      if (inMemoryReceipts.has(receiptKey) || Array.from(inMemoryReceipts.values()).some((r) => r.operationId === operationId)) {
-        return { hint, deductionApplied: 0, replayed: true };
-      }
+      throw error;
     }
-
-    // 2. Create receipt
-    const receipt: HintReceipt = {
-      id: `rcpt_${uuidv4()}`,
-      operationId,
-      contestId,
-      userId,
-      problemId,
-      hintId,
-      deductionApplied: hint.deductionPoints,
-      createdAt: new Date()
-    };
-
-    try {
-      await prisma.hintReceipt.create({ data: receipt });
-    } catch {
-      inMemoryReceipts.set(receiptKey, receipt);
-    }
-
-    return { hint, deductionApplied: hint.deductionPoints, replayed: false };
   }
 
   static async getTotalHintPenaltiesForUser(userId: string, contestId: string): Promise<number> {
@@ -171,17 +149,6 @@ export class HintRepository {
   }
 
   static async getUserHintReceipts(userId: string, contestId: string): Promise<HintReceipt[]> {
-    try {
-      const receipts = await prisma.hintReceipt.findMany({
-        where: { userId, contestId }
-      });
-      if (receipts && receipts.length > 0) return receipts;
-    } catch {
-      // Fallback
-    }
-
-    return Array.from(inMemoryReceipts.values()).filter(
-      (r) => r.userId === userId && r.contestId === contestId
-    );
+    return prisma.hintReceipt.findMany({ where: { userId, contestId } });
   }
 }

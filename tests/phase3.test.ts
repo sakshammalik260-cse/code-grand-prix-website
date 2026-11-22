@@ -3,6 +3,9 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
+import { assertIsolatedDatabase } from "./isolation.js";
+import { prisma } from "../src/config/database.js";
 import { createApp } from "../src/app.js";
 import { AddressInfo } from "net";
 
@@ -28,7 +31,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -74,6 +77,7 @@ function makeRequest(
 }
 
 async function runTests() {
+  assertIsolatedDatabase();
   console.log("====================================================");
   console.log("🧪 STARTING PHASE 3 CORE BACKEND TEST SUITE");
   console.log("====================================================\n");
@@ -81,7 +85,8 @@ async function runTests() {
   const app = createApp();
   const server = http.createServer(app);
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
     server.listen(0, "127.0.0.1", () => resolve());
   });
 
@@ -95,6 +100,7 @@ async function runTests() {
       console.log(`  ✅ PASS: ${testName}`);
     } else {
       console.error(`  ❌ FAIL: ${testName}`);
+      process.exitCode = 1;
       if (details) console.error(`     Details: ${details}`);
     }
   }
@@ -106,8 +112,8 @@ async function runTests() {
     console.log("📋 Test Group 1: Health & Diagnostics");
     const healthRes = await makeRequest(server, "GET", "/api/health");
     assert(
-      healthRes.status === 200 || healthRes.status === 503,
-      "Health check returns valid HTTP status (200 or 503)",
+      healthRes.status === 200 && healthRes.body.database === "connected",
+      "Health check confirms PostgreSQL connectivity",
       `Got status: ${healthRes.status}`
     );
     assert(
@@ -137,14 +143,14 @@ async function runTests() {
       password: "driver123"
     });
     assert(
-      participantLogin.status === 200 && participantLogin.body.token !== undefined,
+      participantLogin.status === 200 && authCookie(participantLogin.headers["set-cookie"]) !== undefined,
       "Valid participant login returns 200 with JWT token and profile",
       JSON.stringify(participantLogin.body)
     );
-    const participantToken = participantLogin.body.token;
+    const participantToken = authCookie(participantLogin.headers["set-cookie"]);
     assert(
       participantLogin.body.user.driverId === "CGP_045" &&
-        participantLogin.body.user.role === "participant",
+        participantLogin.body.user.role === "CANDIDATE",
       "Participant role is accurately assigned"
     );
     assert(
@@ -159,8 +165,8 @@ async function runTests() {
       password: "racecontrol2026"
     });
     assert(
-      volunteerLogin.status === 200 && volunteerLogin.body.user.role === "volunteer",
-      "Volunteer login returns role 'volunteer'",
+      volunteerLogin.status === 200 && volunteerLogin.body.user.role === "VOLUNTEER",
+      "Volunteer login returns role 'VOLUNTEER'",
       JSON.stringify(volunteerLogin.body)
     );
 
@@ -286,18 +292,22 @@ async function runTests() {
     );
 
     // SECURITY VERIFICATION: Hidden tests must NEVER be returned!
-    const sampleExamples = problemDetail.body.examples || [];
+    const sampleExamples = problemDetail.body.samples || [];
     assert(
       sampleExamples.length > 0,
       "Sample test cases are present for participant reference"
     );
-    // Check that hidden test outputs or unflagged tests are strictly absent
-    const hasHiddenTests = sampleExamples.some(
-      (tc: any) => tc.isPublic === false || tc.input === "3 350\n351 352 353"
-    );
+    const seeded = await prisma.problem.findUniqueOrThrow({
+      where: { slug: "speed-trap-detection" },
+      include: { testCases: true }
+    });
+    const publicIds = seeded.testCases.filter(test => test.isPublic).map(test => test.id).sort();
+    const receivedIds = sampleExamples.map((test: { id: string }) => test.id).sort();
     assert(
-      !hasHiddenTests,
-      "SECURITY PASS: Hidden test cases (isPublic: false) are NEVER exposed via public APIs"
+      seeded.testCases.some(test => !test.isPublic) &&
+        JSON.stringify(receivedIds) === JSON.stringify(publicIds) &&
+        !("testCases" in problemDetail.body),
+      "Public problem detail includes exactly the public cases and omits private case records"
     );
 
     // Languages API
@@ -357,9 +367,11 @@ async function runTests() {
     console.log(`🏁 TEST RESULTS: ${testsPassed} / ${testsTotal} PASSED`);
     console.log("====================================================\n");
   } catch (error) {
+    process.exitCode = 1;
     console.error("❌ Unexpected test execution error:", error);
   } finally {
-    server.close();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    await prisma.$disconnect();
   }
 }
 

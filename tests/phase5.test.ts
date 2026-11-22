@@ -3,11 +3,15 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
+import { assertIsolatedDatabase } from "./isolation.js";
+import { prisma } from "../src/config/database.js";
 import { createApp } from "../src/app.js";
 import { AddressInfo } from "net";
 
 interface HttpResponse {
   status: number;
+  headers: http.IncomingHttpHeaders;
   body: any;
 }
 
@@ -27,7 +31,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -56,6 +60,7 @@ function makeRequest(
           }
           resolve({
             status: res.statusCode || 500,
+            headers: res.headers,
             body: parsed
           });
         });
@@ -72,6 +77,7 @@ function makeRequest(
 }
 
 async function runTests() {
+  assertIsolatedDatabase();
   console.log("====================================================");
   console.log("🛡️  STARTING PHASE 5 INCIDENTS, RACE CONTROL & HINTS TEST SUITE");
   console.log("====================================================\n");
@@ -79,7 +85,8 @@ async function runTests() {
   const app = createApp();
   const server = http.createServer(app);
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
     server.listen(0, "127.0.0.1", () => resolve());
   });
 
@@ -93,6 +100,7 @@ async function runTests() {
       console.log(`  ✅ PASS: ${testName}`);
     } else {
       console.error(`  ❌ FAIL: ${testName}`);
+      process.exitCode = 1;
       if (details) console.error(`     Details: ${details}`);
     }
   }
@@ -103,21 +111,21 @@ async function runTests() {
       driverId: "CGP2026",
       password: "Race2026!"
     });
-    const candidateToken = candidateLogin.body.token;
+    const candidateToken = authCookie(candidateLogin.headers["set-cookie"]);
 
     // 2. Authenticate Volunteer
     const volunteerLogin = await makeRequest(server, "POST", "/api/auth/login", {
       driverId: "VOLUNTEER2026",
       password: "Marshal2026!"
     });
-    const volunteerToken = volunteerLogin.body.token;
+    const volunteerToken = authCookie(volunteerLogin.headers["set-cookie"]);
 
     // 3. Authenticate Admin
     const adminLogin = await makeRequest(server, "POST", "/api/auth/login", {
       driverId: "ADMIN2026",
       password: "Control2026!"
     });
-    const adminToken = adminLogin.body.token;
+    const adminToken = authCookie(adminLogin.headers["set-cookie"]);
 
     // Checkin Candidate
     await makeRequest(
@@ -240,7 +248,9 @@ async function runTests() {
 
     // Test 2.4: Atomic One-Action Bulk Session Resume
     const candidateSession = participantsRes.body.find((p: any) => p.driverId === "CGP2026");
-    const sessionId = candidateSession?.id || "sess_u_cgp2026_cgp_2026";
+    assert(candidateSession?.status === "LOCKED" && Number.isInteger(candidateSession.revision),
+      "Staff receives the locked session and its current revision");
+    const sessionId = candidateSession.id;
 
     const bulkResumeRes = await makeRequest(
       server,
@@ -249,7 +259,8 @@ async function runTests() {
       {
         decision: "AUTHORIZE_RESUME",
         note: "Volunteer inspected video stream and confirmed innocent tab switch.",
-        idempotencyKey: "approval-test-001"
+        idempotencyKey: "approval-test-001",
+        expectedSessionRevision: candidateSession.revision
       },
       volunteerToken
     );
@@ -342,7 +353,7 @@ async function runTests() {
     );
 
     // Test 4.2: Public Leaderboard
-    const leaderboardRes = await makeRequest(server, "GET", "/api/leaderboard");
+    const leaderboardRes = await makeRequest(server, "GET", "/api/leaderboard", undefined, candidateToken);
     assert(
       leaderboardRes.status === 200 &&
         leaderboardRes.body.visible === true &&
@@ -419,9 +430,11 @@ async function runTests() {
     console.log(`🏁 PHASE 5 TEST RESULTS: ${testsPassed} / ${testsTotal} PASSED`);
     console.log("====================================================\n");
   } catch (error) {
+    process.exitCode = 1;
     console.error("❌ Unexpected test execution error:", error);
   } finally {
-    server.close();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    await prisma.$disconnect();
   }
 }
 

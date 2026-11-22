@@ -1,3 +1,7 @@
+import { visibleProblem } from "../services/round.service.js";
+import { AppError } from "../middleware/error.middleware.js";
+import { ERROR_CODES } from "../constants/index.js";
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — SUBMISSION REPOSITORY
 // ==============================================================================
@@ -16,7 +20,7 @@ export interface CreateSubmissionInput {
 }
 
 export class SubmissionRepository {
-  static async create(input: CreateSubmissionInput): Promise<Submission> {
+  static async create(input: CreateSubmissionInput, expectedRevision: number, sessionId: string): Promise<Submission> {
     const id = `sub_${uuidv4()}`;
     const newSubmission: Submission = {
       id,
@@ -36,15 +40,23 @@ export class SubmissionRepository {
       updatedAt: new Date()
     };
 
-    try {
-      const created = await prisma.submission.create({
-        data: newSubmission
-      });
-      return created;
-    } catch {
-      inMemorySubmissions.set(id, newSubmission);
-      return newSubmission;
-    }
+    return prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM sessions WHERE id = ${sessionId} AND "userId" = ${input.userId} FOR SHARE`;
+      const session = await tx.session.findFirst({ where: { id: sessionId, userId: input.userId },
+        select: { status: true, checkinStatus: true } });
+      if (!session || !["ACTIVE", "RESUME_AUTHORIZED"].includes(session.status)) {
+        throw new AppError(403, ERROR_CODES.SESSION_LOCKED, "Session is no longer active.");
+      }
+      if (session.checkinStatus !== "READY") {
+        throw new AppError(403, ERROR_CODES.CHECKIN_INCOMPLETE, "Pre-race check-in is incomplete.");
+      }
+      await tx.$queryRaw`SELECT id FROM problems WHERE id = ${input.problemId} FOR UPDATE`;
+      const available = await tx.problem.findFirst({ where: {
+        AND: [visibleProblem(), { id: input.problemId, revision: expectedRevision }]
+      }, select: { id: true } });
+      if (!available) throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Question or round changed. Refresh before submitting.");
+      return tx.submission.create({ data: newSubmission });
+    });
   }
 
   static async updateVerdict(
@@ -69,7 +81,8 @@ export class SubmissionRepository {
         }
       });
       return updated;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const existing = inMemorySubmissions.get(id);
       if (!existing) return null;
       const updated: Submission = {
@@ -91,7 +104,8 @@ export class SubmissionRepository {
         where: { id }
       });
       if (found) return found;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
     }
     return inMemorySubmissions.get(id) || null;
@@ -104,7 +118,8 @@ export class SubmissionRepository {
         orderBy: { createdAt: "desc" }
       });
       if (submissions && submissions.length > 0) return submissions;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
     }
 
@@ -119,7 +134,8 @@ export class SubmissionRepository {
         where: { userId, verdict: Verdict.ACCEPTED }
       });
       if (submissions && submissions.length > 0) return submissions;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
     }
 
@@ -134,7 +150,8 @@ export class SubmissionRepository {
         where: { userId }
       });
       if (submissions && submissions.length > 0) return submissions;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
     }
 

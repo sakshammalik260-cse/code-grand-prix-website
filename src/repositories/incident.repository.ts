@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — INCIDENT & AUDIT REPOSITORY
 // ==============================================================================
@@ -28,7 +29,8 @@ export class IncidentRepository {
         where: { eventId }
       });
       if (found) return found;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
     }
 
@@ -64,7 +66,8 @@ export class IncidentRepository {
         data: newIncident
       });
       return created;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       inMemoryIncidents.set(id, newIncident);
       return newIncident;
     }
@@ -76,7 +79,8 @@ export class IncidentRepository {
         where: { id }
       });
       if (found) return found;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
     }
     return inMemoryIncidents.get(id) || null;
@@ -88,7 +92,8 @@ export class IncidentRepository {
         orderBy: { receivedAt: "desc" }
       });
       if (incidents && incidents.length > 0) return incidents;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
     }
     return Array.from(inMemoryIncidents.values()).sort(
@@ -103,7 +108,8 @@ export class IncidentRepository {
         orderBy: { receivedAt: "desc" }
       });
       if (incidents && incidents.length > 0) return incidents;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
     }
     return Array.from(inMemoryIncidents.values())
@@ -130,7 +136,8 @@ export class IncidentRepository {
         }
       });
       return updated;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const incident = inMemoryIncidents.get(id);
       if (!incident) return null;
       incident.status =
@@ -165,7 +172,8 @@ export class IncidentRepository {
         }
       });
       return await this.findBySessionId(sessionId);
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const resolvedList: Incident[] = [];
       for (const incident of inMemoryIncidents.values()) {
         if (incident.sessionId === sessionId && incident.status === IncidentStatus.OPEN) {
@@ -189,6 +197,7 @@ export class IncidentRepository {
   ): Promise<AuditLog> {
     const log: AuditLog = {
       id: `audit_${uuidv4()}`,
+      idempotencyKey: null,
       volunteerId,
       incidentId: details.incidentId || null,
       participantId: details.participantId || null,
@@ -202,7 +211,8 @@ export class IncidentRepository {
 
     try {
       await prisma.auditLog.create({ data: log });
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       inMemoryAuditLogs.push(log);
     }
 

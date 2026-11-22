@@ -24,6 +24,7 @@ export interface JwtPayload {
   role: Role;
   contestId: string;
   jti?: string;
+  issuedAtMs?: number;
   iat?: number;
   exp?: number;
 }
@@ -41,6 +42,7 @@ declare global {
 
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    res.set("Cache-Control", "no-store");
     // 1. Extract token from Authorization Bearer header or HttpOnly cookie
     let token: string | undefined;
     const authHeader = req.headers.authorization;
@@ -62,7 +64,24 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    // 2. Check if token is blacklisted / revoked
+    // Verify a token before consulting the database.
+    let decoded: JwtPayload;
+    try {
+      decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] }) as JwtPayload;
+      if (typeof decoded.userId !== "string" || decoded.contestId !== env.CONTEST_ID) {
+        throw new Error("Invalid token claims.");
+      }
+    } catch {
+      res.status(401).json({
+        success: false,
+        error: {
+          code: ERROR_CODES.UNAUTHENTICATED,
+          message: "Invalid or expired session token. Please log in again."
+        }
+      });
+      return;
+    }
+
     const isRevoked = await TokenRepository.isTokenRevoked(token);
     if (isRevoked) {
       res.status(401).json({
@@ -70,21 +89,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
         error: {
           code: ERROR_CODES.UNAUTHENTICATED,
           message: "Session token has been revoked. Please log in again."
-        }
-      });
-      return;
-    }
-
-    // 3. Verify JWT signature & expiration
-    let decoded: JwtPayload;
-    try {
-      decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
-    } catch {
-      res.status(401).json({
-        success: false,
-        error: {
-          code: ERROR_CODES.UNAUTHENTICATED,
-          message: "Invalid or expired session token. Please log in again."
         }
       });
       return;
@@ -104,8 +108,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     }
 
     // 5. Check if token was issued prior to user's last logout
-    if (user.lastLogoutAt && decoded.iat) {
-      const issuedAt = decoded.iat * 1000;
+    const issuedAt = decoded.issuedAtMs ?? (decoded.iat ?? 0) * 1000;
+    if (user.lastLogoutAt) {
       if (issuedAt < user.lastLogoutAt.getTime()) {
         res.status(401).json({
           success: false,

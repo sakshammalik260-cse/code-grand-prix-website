@@ -17,6 +17,8 @@ export const violationSchema = z.object({
   occurredAt: z.string().optional(),
   problemId: z.string().nullable().optional(),
   details: z.any().optional()
+}).refine(data => !!(data.clientEventId || data.eventId), {
+  message: "clientEventId (or legacy eventId) is required for reliable incident deduplication"
 });
 
 export class ViolationController {

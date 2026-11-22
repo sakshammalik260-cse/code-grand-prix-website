@@ -1,46 +1,41 @@
+import { LeaderboardService } from "./leaderboard.service.js";
+import { prisma } from "../config/database.js";
+import type { Incident } from "@prisma/client";
+import { CheckinService } from "./checkin.service.js";
+import { Prisma, RaceSessionStatus, IncidentStatus, Role } from "@prisma/client";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — VOLUNTEER & RACE CONTROL SERVICE
 // ==============================================================================
 
-import { v4 as uuidv4 } from "uuid";
 import { ERROR_CODES } from "../constants/index.js";
 import { AppError } from "../middleware/error.middleware.js";
 import { IncidentRepository } from "../repositories/incident.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
 import { UserRepository } from "../repositories/user.repository.js";
-import { SubmissionRepository } from "../repositories/submission.repository.js";
 import { env } from "../config/env.js";
 
 export class VolunteerService {
-  private static idempotencyStore = new Map<string, any>();
 
   /**
    * List participants with live competition session status, score, and lock details
    */
-  static async listParticipants() {
+  static async listParticipants(role: Role) {
     const participants = await UserRepository.findAllParticipants();
+    const standings = await LeaderboardService.getLeaderboard(role);
+    const scoreByDriver = new Map(standings.rows.map(row => [row.driverId, row.totalScore]));
     const result = [];
 
     for (const p of participants) {
-      const session = await SessionRepository.findOrCreate(p.id, env.CONTEST_ID);
-      const solvedSubmissions = await SubmissionRepository.findAllSolvedByUser(p.id);
-      const score = solvedSubmissions.reduce((sum, s) => sum + s.score, 0);
+      const { session, lockReason, lastSeenAt, cameraStatus, lockCount } = await CheckinService.getSession(p.id, env.CONTEST_ID);
+      const score = scoreByDriver.get(p.driverId);
 
       result.push({
-        id: session.id,
-        driverId: p.driverId,
+        ...session,
         displayName: p.displayName,
         team: p.team || "CPC Grid",
         raceStatus: session.status,
-        status: session.status,
-        score,
-        lastSeenAt: session.lastSeenAt.toISOString(),
-        cameraStatus: session.cameraStatus,
-        lockCount: session.lockCount,
-        lockReason: session.lockReason,
-        revision: session.revision,
-        policy: SessionRepository.getPolicy(session.status),
-        simulation: false
+        ...(score === undefined ? {} : { score }),
+        lastSeenAt, cameraStatus, lockCount, lockReason
       });
     }
 
@@ -51,47 +46,21 @@ export class VolunteerService {
    * List reported incidents
    */
   static async listIncidents() {
-    const incidents = await IncidentRepository.findAll();
-    return incidents.map((inc) => ({
-      id: inc.id,
-      clientEventId: inc.eventId,
-      sessionId: inc.sessionId,
-      type: inc.type,
-      reviewStatus: inc.status,
-      status: inc.status,
-      blocking: inc.blocking,
-      detectedAt: inc.occurredAt.toISOString(),
-      timestamp: inc.receivedAt.toISOString(),
-      details: inc.details,
-      resolvedAt: inc.resolvedAt?.toISOString() || null,
-      resolvedBy: inc.resolvedBy || null,
-      simulation: false
-    }));
+    const incidents = await prisma.incident.findMany({
+      where: { session: { contestId: env.CONTEST_ID } },
+      include: { user: { select: { driverId: true } } },
+      orderBy: { receivedAt: "desc" }
+    });
+    return incidents.map(item => incidentDto(item, env.CONTEST_ID, item.user.driverId));
   }
 
-  /**
-   * Get single incident by ID
-   */
   static async getIncidentById(id: string) {
-    const inc = await IncidentRepository.findById(id);
-    if (!inc) {
-      throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Incident '${id}' not found.`);
-    }
-
-    return {
-      id: inc.id,
-      clientEventId: inc.eventId,
-      sessionId: inc.sessionId,
-      type: inc.type,
-      reviewStatus: inc.status,
-      status: inc.status,
-      blocking: inc.blocking,
-      detectedAt: inc.occurredAt.toISOString(),
-      timestamp: inc.receivedAt.toISOString(),
-      details: inc.details,
-      resolvedAt: inc.resolvedAt?.toISOString() || null,
-      resolvedBy: inc.resolvedBy || null
-    };
+    const incident = await prisma.incident.findFirst({
+      where: { id, session: { contestId: env.CONTEST_ID } },
+      include: { user: { select: { driverId: true } } }
+    });
+    if (!incident) throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Incident not found.");
+    return incidentDto(incident, env.CONTEST_ID, incident.user.driverId);
   }
 
   /**
@@ -101,8 +70,31 @@ export class VolunteerService {
     incidentId: string,
     action: string,
     reason: string,
-    volunteerId: string
+    volunteerId: string,
+    expectedSessionRevision?: number
   ) {
+    if (expectedSessionRevision !== undefined) {
+      return prisma.$transaction(async tx => {
+        const incident = await tx.incident.findFirst({
+          where: { id: incidentId, session: { contestId: env.CONTEST_ID } },
+          include: { session: true, user: { select: { driverId: true } } }
+        });
+        if (!incident) throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Incident not found.");
+        if (incident.session.revision !== expectedSessionRevision || incident.status !== IncidentStatus.OPEN) {
+          throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Incident or session changed; refresh Race Control.");
+        }
+        if (!["KEEP_LOCKED", "ESCALATE"].includes(action)) {
+          throw new AppError(400, ERROR_CODES.VALIDATION_ERROR, "Use session authorization to clear blocking incidents.");
+        }
+        const resolved = await tx.incident.update({ where: { id: incidentId }, data: {
+          status: IncidentStatus.RESOLVED, resolvedAt: new Date(), resolvedBy: volunteerId,
+          resolutionAction: action, resolutionReason: reason
+        } });
+        await tx.auditLog.create({ data: { volunteerId, action, reason, incidentId,
+          participantId: incident.userId, sessionId: incident.sessionId } });
+        return { success: true, incident: incidentDto(resolved, env.CONTEST_ID, incident.user.driverId), session: null };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }).catch(handleConcurrentReview);
+    }
     const incident = await IncidentRepository.findById(incidentId);
     if (!incident) {
       throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Incident '${incidentId}' not found.`);
@@ -110,11 +102,9 @@ export class VolunteerService {
 
     const resolved = await IncidentRepository.resolve(incidentId, action, reason, volunteerId);
 
-    // If approved to resume, resume session
-    let updatedSession = null;
-    if (action === "APPROVE_RESUME" || action === "AUTHORIZE_RESUME") {
-      updatedSession = await SessionRepository.resumeSession(incident.userId, env.CONTEST_ID);
-    }
+    // Individual reviews only record a decision. They cannot bypass unresolved
+    // incidents; use the atomic AUTHORIZE & RESUME SESSION action to unlock.
+    const updatedSession = null;
 
     await IncidentRepository.createAuditLog(volunteerId, action, reason, {
       incidentId,
@@ -137,92 +127,135 @@ export class VolunteerService {
     volunteerId: string,
     input: {
       decision: string;
+      contestId?: string;
+      driverId?: string;
+      expectedIncidentIds?: string[];
       expectedSessionRevision?: number;
       note: string;
       idempotencyKey?: string;
     }
   ) {
-    // C16: Idempotency check
-    if (input.idempotencyKey && VolunteerService.idempotencyStore.has(input.idempotencyKey)) {
-      return VolunteerService.idempotencyStore.get(input.idempotencyKey);
+    if (input.decision !== "AUTHORIZE_RESUME" && input.decision !== "APPROVE_RESUME") {
+      throw new AppError(400, ERROR_CODES.VALIDATION_ERROR, "Unsupported race-control decision.");
     }
-
-    const session = await SessionRepository.findById(sessionId);
-    if (!session) {
-      throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, `Session '${sessionId}' not found.`);
+    if (!input.idempotencyKey || !input.idempotencyKey.trim() ||
+        !Number.isInteger(input.expectedSessionRevision) || !input.expectedSessionRevision) {
+      throw new AppError(400, ERROR_CODES.VALIDATION_ERROR,
+        "A non-empty idempotencyKey and expectedSessionRevision are required.");
     }
-
-    // C15: Exact monotonic revision check (mismatch indicates concurrent state update)
-    if (
-      input.expectedSessionRevision !== undefined &&
-      session.revision !== input.expectedSessionRevision
-    ) {
-      throw new AppError(
-        409,
-        ERROR_CODES.INTERNAL_SERVER_ERROR,
-        `Stale session revision: Session has revision ${session.revision}, expected ${input.expectedSessionRevision}.`
-      );
-    }
-
-    // 1. Bulk resolve all open incidents for this session
-    const resolvedIncidents = await IncidentRepository.bulkResolveForSession(
-      sessionId,
-      input.decision,
-      input.note,
-      volunteerId
-    );
-
-    // 2. Unlock session and set status back to ACTIVE
-    const updatedSession = await SessionRepository.authorizeResumeById(sessionId);
-
-    // 3. Create single signed approval audit record
-    await IncidentRepository.createAuditLog(volunteerId, input.decision, input.note, {
-      sessionId,
-      participantId: session.userId,
-      previousState: session.status,
-      newState: "ACTIVE"
-    });
-
-    const latestIncident = resolvedIncidents[0] || null;
-
-    const result = {
-      incident: latestIncident
-        ? {
-            id: latestIncident.id,
-            clientEventId: latestIncident.eventId,
-            sessionId: latestIncident.sessionId,
-            type: latestIncident.type,
-            reviewStatus: latestIncident.status,
-            blocking: latestIncident.blocking,
-            timestamp: latestIncident.receivedAt.toISOString(),
-            simulation: false
-          }
-        : null,
-      session: updatedSession
-        ? {
-            id: updatedSession.id,
-            driverId: session.userId,
-            status: updatedSession.status,
-            revision: updatedSession.revision,
-            policy: SessionRepository.getPolicy(updatedSession.status),
-            updatedAt: updatedSession.updatedAt.toISOString()
-          }
-        : null,
-      authorization: {
-        id: `auth_${uuidv4()}`,
-        incidentId: latestIncident?.id || "session_bulk",
-        decision: input.decision,
-        actorId: volunteerId,
-        actorRole: "VOLUNTEER",
-        decidedAt: new Date().toISOString(),
-        simulation: false
+    const operationId = input.idempotencyKey;
+    const response = await prisma.$transaction(async (tx) => {
+      const staff = await tx.user.findUnique({ where: { id: volunteerId } });
+      if (!staff || (staff.role !== Role.VOLUNTEER && staff.role !== Role.ADMIN)) {
+        throw new AppError(403, ERROR_CODES.FORBIDDEN_ROLE, "Race Control authorization requires staff privileges.");
       }
-    };
-
-    if (input.idempotencyKey) {
-      VolunteerService.idempotencyStore.set(input.idempotencyKey, result);
-    }
-
-    return result;
+      const existing = await tx.auditLog.findUnique({ where: { idempotencyKey: operationId } });
+      if (existing && (existing.sessionId !== sessionId || existing.volunteerId !== volunteerId ||
+          existing.action !== "AUTHORIZE_RESUME")) {
+        throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Idempotency key already belongs to a different authorization.");
+      }
+      let session = await tx.session.findUnique({ where: { id: sessionId } });
+      if (!session) throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Session not found.");
+      const candidate = await tx.user.findUnique({ where: { id: session.userId } });
+      if (!candidate) throw new AppError(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Candidate not found.");
+      if (session.contestId !== env.CONTEST_ID || (input.contestId && input.contestId !== session.contestId) ||
+          (input.driverId && input.driverId !== candidate.driverId)) {
+        throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Session scope has changed; refresh Race Control.");
+      }
+      let audit = existing;
+      if (!audit) {
+        if (session.revision !== input.expectedSessionRevision) {
+          throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Session revision has changed; refresh Race Control.");
+        }
+        if (
+          session.status !== RaceSessionStatus.LOCKED &&
+          session.status !== RaceSessionStatus.LOCK_PENDING &&
+          session.status !== RaceSessionStatus.UNDER_REVIEW
+        ) {
+          throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Session is not awaiting authorization.");
+        }
+        const blockers = await tx.incident.findMany({
+          where: { sessionId, blocking: true, status: { not: IncidentStatus.AUTHORIZED } },
+          select: { id: true }, orderBy: { id: "asc" }
+        });
+        const ids = blockers.map(item => item.id);
+        if (input.expectedIncidentIds && (!ids.length || !sameIds(ids, input.expectedIncidentIds))) {
+          throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "The outstanding incident set changed; review it again.");
+        }
+        const decidedAt = new Date();
+        const previousState = session.status;
+        const changed = await tx.session.updateMany({
+          where: { id: sessionId, revision: input.expectedSessionRevision, status: {
+            in: [RaceSessionStatus.LOCKED, RaceSessionStatus.LOCK_PENDING, RaceSessionStatus.UNDER_REVIEW]
+          } },
+          data: { status: RaceSessionStatus.ACTIVE, lockReason: null, resumedAt: new Date(),
+            revision: { increment: 1 } }
+        });
+        if (changed.count !== 1) {
+          throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Concurrent session update; refresh and retry.");
+        }
+        await tx.incident.updateMany({ where: { id: { in: ids } },
+          data: { status: IncidentStatus.AUTHORIZED, resolvedAt: decidedAt,
+            resolvedBy: volunteerId, resolutionAction: "AUTHORIZE_RESUME", resolutionReason: input.note } });
+        audit = await tx.auditLog.create({ data: {
+          volunteerId, sessionId, participantId: session.userId, action: "AUTHORIZE_RESUME",
+          reason: input.note, previousState, newState: "ACTIVE", idempotencyKey: operationId,
+          incidentId: ids[0], createdAt: decidedAt
+        } });
+        session = await tx.session.findUniqueOrThrow({ where: { id: sessionId } });
+      }
+      const latest = await tx.incident.findFirst({ where: { sessionId }, orderBy: { receivedAt: "desc" } });
+      const incident = latest ? incidentDto(latest, session.contestId, candidate.driverId) : null;
+      const incidents = (await tx.incident.findMany({
+        where: { sessionId, blocking: true, resolvedBy: volunteerId, resolvedAt: audit.createdAt,
+          resolutionAction: "AUTHORIZE_RESUME" },
+        orderBy: { id: "asc" }
+      })).map(item => incidentDto(item, session.contestId, candidate.driverId));
+      const coveredIncidentIds = incidents.map(item => item.id);
+      if (existing && input.expectedIncidentIds &&
+          (!sameIds(coveredIncidentIds, input.expectedIncidentIds) || audit.reason !== input.note ||
+            session.revision !== input.expectedSessionRevision! + 1 || session.status !== RaceSessionStatus.ACTIVE)) {
+        throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Authorization changed; refresh Race Control.");
+      }
+      const authorization = {
+        id: audit.id, incidentId: audit.incidentId || "session_bulk", sessionId, coveredIncidentIds, decision: "AUTHORIZE_RESUME" as const,
+        actorId: volunteerId, actorRole: staff.role as "VOLUNTEER" | "ADMIN",
+        decidedAt: audit.createdAt.toISOString(), simulation: false
+      };
+      return {
+        incident, incidents,
+        session: { id: session.id, contestId: session.contestId, driverId: candidate.driverId,
+          status: session.status, revision: session.revision,
+          updatedAt: session.updatedAt.toISOString(), serverTime: new Date().toISOString(),
+          policy: SessionRepository.getPolicy(session.status), latestIncident: incident,
+          resumeAuthorization: authorization, volunteerNotified: true, simulation: false },
+        authorization
+      };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }).catch(handleConcurrentReview);
+    return response;
   }
+
+}
+
+function sameIds(first: string[], second: string[]) {
+  return JSON.stringify([...first].sort()) === JSON.stringify([...second].sort());
+}
+
+function incidentDto(item: Incident, contestId: string, driverId: string) {
+  const observedAt = item.occurredAt.toISOString();
+  return {
+    id: item.id, contestId, driverId, clientEventId: item.eventId, sessionId: item.sessionId,
+    type: item.type, observedAt, detectedAt: observedAt, problemId: item.problemId,
+    reviewStatus: item.status, status: item.status, blocking: item.blocking,
+    timestamp: item.receivedAt.toISOString(), details: item.details,
+    resolvedAt: item.resolvedAt?.toISOString() ?? null, resolvedBy: item.resolvedBy,
+    resolutionAction: item.resolutionAction, resolutionReason: item.resolutionReason, simulation: false
+  };
+}
+
+function handleConcurrentReview(error: unknown): never {
+  if (error instanceof Prisma.PrismaClientKnownRequestError && ["P2034", "P2002"].includes(error.code)) {
+    throw new AppError(409, ERROR_CODES.VALIDATION_ERROR, "Another Race Control request changed this session. Refresh and review again.");
+  }
+  throw error;
 }

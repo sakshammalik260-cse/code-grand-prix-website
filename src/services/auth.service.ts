@@ -10,9 +10,12 @@ import { ERROR_CODES } from "../constants/index.js";
 import { AppError } from "../middleware/error.middleware.js";
 import { UserRepository } from "../repositories/user.repository.js";
 import { SessionRepository } from "../repositories/session.repository.js";
-import { ContestRepository } from "../repositories/contest.repository.js";
+import { RoundService } from "./round.service.js";
 import { TokenRepository } from "../repositories/token.repository.js";
 import { Role } from "@prisma/client";
+
+// Match the cost used by provisioned credentials even when the driver ID is unknown.
+const dummyHash = bcrypt.hashSync(uuidv4(), 10);
 
 export class AuthService {
   /**
@@ -29,7 +32,9 @@ export class AuthService {
    */
   static async login(driverId: string, password: string) {
     const user = await UserRepository.findByDriverId(driverId);
-    if (!user) {
+    const validLength = Buffer.byteLength(password) <= 72;
+    const isMatch = await bcrypt.compare(validLength ? password : "", user?.passwordHash ?? dummyHash);
+    if (!user || !validLength || !isMatch) {
       throw new AppError(
         401,
         ERROR_CODES.INVALID_CREDENTIALS,
@@ -37,18 +42,8 @@ export class AuthService {
       );
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      throw new AppError(
-        401,
-        ERROR_CODES.INVALID_CREDENTIALS,
-        "Invalid driver ID or password."
-      );
-    }
-
-    const contest = await ContestRepository.getContest(env.CONTEST_ID);
-    const timeDetails = ContestRepository.calculateTimeDetails(contest);
-    const session = await SessionRepository.findOrCreate(user.id, contest.id);
+    const timeDetails = await RoundService.clock(env.CONTEST_ID);
+    const session = await SessionRepository.findOrCreate(user.id, timeDetails.id);
 
     const jti = uuidv4();
     const token = jwt.sign(
@@ -56,11 +51,12 @@ export class AuthService {
         userId: user.id,
         driverId: user.driverId,
         role: user.role,
-        contestId: contest.id,
+        contestId: timeDetails.id,
+        issuedAtMs: Date.now(),
         jti
       },
       env.JWT_SECRET,
-      { expiresIn: "8h" }
+      { expiresIn: env.JWT_EXPIRES_IN }
     );
 
     const normalizedRole = this.normalizeRole(user.role);
@@ -81,7 +77,7 @@ export class AuthService {
         role: normalizedRole
       },
       contest: {
-        id: contest.id,
+        id: timeDetails.id,
         status: timeDetails.status
       },
       session: {
@@ -119,7 +115,7 @@ export class AuthService {
    * Invalidate authenticated session and token
    */
   static async logout(token: string, userId: string) {
-    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + env.JWT_EXPIRES_IN * 1000);
     await TokenRepository.revokeToken(token, expiresAt);
     await UserRepository.updateLastLogout(userId, new Date());
 

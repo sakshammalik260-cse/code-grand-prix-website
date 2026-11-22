@@ -1,3 +1,4 @@
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — TOKEN REVOCATION REPOSITORY
 // ==============================================================================
@@ -15,14 +16,11 @@ export class TokenRepository {
     inMemoryRevokedTokens.add(token);
 
     try {
-      await prisma.revokedToken.create({
-        data: {
-          token,
-          expiresAt
-        }
+      await prisma.revokedToken.upsert({
+        where: { token }, create: { token, expiresAt }, update: {}
       });
-    } catch {
-      // In-memory fallback is active if DB is unreachable
+    } catch (error) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
     }
   }
 
@@ -42,8 +40,8 @@ export class TokenRepository {
         inMemoryRevokedTokens.add(token);
         return true;
       }
-    } catch {
-      // If DB fails, rely on in-memory set
+    } catch (error) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw error;
     }
 
     return false;

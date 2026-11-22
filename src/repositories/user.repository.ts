@@ -133,13 +133,13 @@ export class UserRepository {
         }
       });
       if (user) return user;
-      if (env.NODE_ENV === "production") return null;
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) return null;
     } catch (error) {
-      if (env.NODE_ENV === "production") {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) {
         throw new AppError(
           503,
           ERROR_CODES.INTERNAL_SERVER_ERROR,
-          "Database service unavailable in production."
+          "Account storage is temporarily unavailable."
         );
       }
     }
@@ -158,13 +158,13 @@ export class UserRepository {
         where: { id }
       });
       if (user) return user;
-      if (env.NODE_ENV === "production") return null;
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) return null;
     } catch (error) {
-      if (env.NODE_ENV === "production") {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) {
         throw new AppError(
           503,
           ERROR_CODES.INTERNAL_SERVER_ERROR,
-          "Database service unavailable in production."
+          "Account storage is temporarily unavailable."
         );
       }
     }
@@ -183,13 +183,13 @@ export class UserRepository {
         }
       });
       if (users && users.length > 0) return users;
-      if (env.NODE_ENV === "production") return [];
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) return [];
     } catch (error) {
-      if (env.NODE_ENV === "production") {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) {
         throw new AppError(
           503,
           ERROR_CODES.INTERNAL_SERVER_ERROR,
-          "Database service unavailable in production."
+          "Account storage is temporarily unavailable."
         );
       }
     }
@@ -207,11 +207,11 @@ export class UserRepository {
       });
       return;
     } catch (error) {
-      if (env.NODE_ENV === "production") {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) {
         throw new AppError(
           503,
           ERROR_CODES.INTERNAL_SERVER_ERROR,
-          "Database service unavailable in production."
+          "Account storage is temporarily unavailable."
         );
       }
     }

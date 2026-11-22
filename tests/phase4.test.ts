@@ -3,13 +3,16 @@
 // ==============================================================================
 
 import http from "http";
+import { authCookie } from "./http-auth.js";
+import { assertIsolatedDatabase } from "./isolation.js";
+import { prisma } from "../src/config/database.js";
+import { SEED_DATA } from "../src/data/seed-data.js";
 import { createApp } from "../src/app.js";
 import { AddressInfo } from "net";
-import { SessionRepository } from "../src/repositories/session.repository.js";
-import { CheckinStatus, RaceSessionStatus } from "@prisma/client";
 
 interface HttpResponse {
   status: number;
+  headers: http.IncomingHttpHeaders;
   body: any;
 }
 
@@ -29,7 +32,7 @@ function makeRequest(
     };
 
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers["Cookie"] = token;
     }
 
     if (postData) {
@@ -58,6 +61,7 @@ function makeRequest(
           }
           resolve({
             status: res.statusCode || 500,
+            headers: res.headers,
             body: parsed
           });
         });
@@ -74,6 +78,7 @@ function makeRequest(
 }
 
 async function runTests() {
+  assertIsolatedDatabase();
   console.log("====================================================");
   console.log("🏎️  STARTING PHASE 4 JUDGE & SUBMISSION TEST SUITE");
   console.log("====================================================\n");
@@ -81,7 +86,8 @@ async function runTests() {
   const app = createApp();
   const server = http.createServer(app);
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
     server.listen(0, "127.0.0.1", () => resolve());
   });
 
@@ -95,6 +101,7 @@ async function runTests() {
       console.log(`  ✅ PASS: ${testName}`);
     } else {
       console.error(`  ❌ FAIL: ${testName}`);
+      process.exitCode = 1;
       if (details) console.error(`     Details: ${details}`);
     }
   }
@@ -105,8 +112,7 @@ async function runTests() {
       driverId: "CGP_045",
       password: "driver123"
     });
-    const token = loginRes.body.token;
-    const userId = loginRes.body.user.id;
+    const token = authCookie(loginRes.headers["set-cookie"]);
 
     // 2. Perform Pre-Race Check-in
     await makeRequest(
@@ -154,7 +160,7 @@ async function runTests() {
       jsCustomRun.status === 200 &&
         jsCustomRun.body.status === "ACCEPTED" &&
         jsCustomRun.body.stdout.trim() === "3 340",
-      "JavaScript execution with custom input runs in isolated sandbox and outputs correct result",
+      "JavaScript execution with custom input runs in the trusted local judge and outputs correct result",
       JSON.stringify(jsCustomRun.body)
     );
     assert(
@@ -294,7 +300,13 @@ if data:
     );
 
     // Test 3.2: Locked Session Blocks Submissions
-    await SessionRepository.lockSession(userId, "cgp_2026", "TAB_HIDDEN violation");
+    const violation = await makeRequest(server, "POST", "/api/violations", {
+      clientEventId: "phase4-tab-hidden",
+      type: "TAB_HIDDEN",
+      observedAt: new Date().toISOString()
+    }, token);
+    assert(violation.status === 200 && violation.body.sessionStatus === "LOCKED",
+      "A monitoring incident locks the checked-in session");
 
     const lockedSubmit = await makeRequest(
       server,
@@ -315,13 +327,12 @@ if data:
     );
 
     // Test 3.3: Incomplete Check-in Blocks Submissions
-    await SessionRepository.updateCheckin(userId, "cgp_2026", {
-      rulesAccepted: false,
-      cameraPermission: false,
-      fullscreenRequested: false,
-      checkinStatus: CheckinStatus.NOT_STARTED,
-      status: RaceSessionStatus.WAITING
+    const unchecked = SEED_DATA.users.find(user => user.driverId === "CGP_016")!;
+    const uncheckedLogin = await makeRequest(server, "POST", "/api/auth/login", {
+      driverId: unchecked.driverId,
+      password: unchecked.password
     });
+    assert(uncheckedLogin.status === 200, "A separate candidate signs in without checking in");
 
     const uncheckedSubmit = await makeRequest(
       server,
@@ -332,7 +343,7 @@ if data:
         language: "javascript",
         sourceCode: `console.log("test");`
       },
-      token
+      authCookie(uncheckedLogin.headers["set-cookie"])
     );
 
     assert(
@@ -346,9 +357,11 @@ if data:
     console.log(`🏁 PHASE 4 TEST RESULTS: ${testsPassed} / ${testsTotal} PASSED`);
     console.log("====================================================\n");
   } catch (error) {
+    process.exitCode = 1;
     console.error("❌ Unexpected test execution error:", error);
   } finally {
-    server.close();
+    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    await prisma.$disconnect();
   }
 }
 

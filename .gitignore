@@ -29,3 +29,13 @@ Thumbs.db
 scratch/
 tmp/
 coverage/
+ops/judge0/.judge0.env
+
+# Local backend repair backups
+.cgp-backups/
+*.pre-hotfix.bak
+
+# Local environment secrets
+.env
+.env.*
+!.env.example

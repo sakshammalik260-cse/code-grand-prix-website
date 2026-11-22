@@ -1,11 +1,16 @@
+import { env } from "../config/env.js";
 // ==============================================================================
 // CODE GRAND PRIX 2026 — SESSION REPOSITORY
 // ==============================================================================
 
 import { prisma } from "../config/database.js";
 import { CheckinStatus, RaceSessionStatus, Session } from "@prisma/client";
+import { AppError } from "../middleware/error.middleware.js";
+import { ERROR_CODES } from "../constants/index.js";
 
 const inMemorySessions: Map<string, Session> = new Map();
+const lockedStatuses: RaceSessionStatus[] = [RaceSessionStatus.LOCKED, RaceSessionStatus.LOCK_PENDING, RaceSessionStatus.UNDER_REVIEW];
+const checkInLocked = () => new AppError(403, ERROR_CODES.SESSION_LOCKED, "Check-in paused because the session was locked. A volunteer must authorize your resume.");
 
 function getSessionKey(userId: string, contestId: string): string {
   return `${userId}:${contestId}`;
@@ -28,7 +33,8 @@ export class SessionRepository {
         }
       });
       return session;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
       const key = getSessionKey(userId, contestId);
       if (!inMemorySessions.has(key)) {
@@ -62,7 +68,8 @@ export class SessionRepository {
         where: { id }
       });
       if (found) return found;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // In-memory fallback
     }
 
@@ -78,7 +85,8 @@ export class SessionRepository {
         include: { user: true }
       });
       if (sessions && sessions.length > 0) return sessions;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       // Fallback
     }
     return Array.from(inMemorySessions.values());
@@ -96,19 +104,21 @@ export class SessionRepository {
     }
   ): Promise<Session> {
     try {
-      const updated = await prisma.session.update({
+      const updated = await prisma.session.updateMany({
         where: {
-          userId_contestId: { userId, contestId }
+          userId, contestId,
+          status: { notIn: lockedStatuses }
         },
-        data: {
-          ...data,
-          revision: { increment: 1 },
-          lastSeenAt: new Date()
-        }
+        data: { ...data, revision: { increment: 1 }, lastSeenAt: new Date() }
       });
-      return updated;
-    } catch {
+      if (updated.count !== 1) {
+        throw checkInLocked();
+      }
+      return await prisma.session.findUniqueOrThrow({ where: { userId_contestId: { userId, contestId } } });
+    } catch (databaseError) {
+      if (databaseError instanceof AppError || env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const session = await this.findOrCreate(userId, contestId);
+      if (lockedStatuses.includes(session.status)) throw checkInLocked();
       session.rulesAccepted = data.rulesAccepted;
       session.cameraPermission = data.cameraPermission;
       session.fullscreenRequested = data.fullscreenRequested;
@@ -136,7 +146,8 @@ export class SessionRepository {
         }
       });
       return updated;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const session = await this.findOrCreate(userId, contestId);
       session.status = RaceSessionStatus.LOCKED;
       session.lockReason = reason;
@@ -162,7 +173,8 @@ export class SessionRepository {
         }
       });
       return updated;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const session = await this.findOrCreate(userId, contestId);
       session.status = RaceSessionStatus.ACTIVE;
       session.lockReason = null;
@@ -185,7 +197,8 @@ export class SessionRepository {
         }
       });
       return updated;
-    } catch {
+    } catch (databaseError) {
+      if (env.NODE_ENV === "production" || !env.ALLOW_DEV_FALLBACK) throw databaseError;
       const session = await this.findById(sessionId);
       if (!session) return null;
       session.status = RaceSessionStatus.ACTIVE;
@@ -198,11 +211,11 @@ export class SessionRepository {
   }
 
   static getPolicy(status: RaceSessionStatus) {
-    const isLocked = status === RaceSessionStatus.LOCKED || status === RaceSessionStatus.LOCK_PENDING;
+    const canProceed = status === RaceSessionStatus.ACTIVE || status === RaceSessionStatus.RESUME_AUTHORIZED;
     return {
-      allowExecution: !isLocked,
-      allowEditing: !isLocked,
-      allowNavigation: !isLocked
+      allowExecution: canProceed,
+      allowEditing: canProceed,
+      allowNavigation: canProceed
     };
   }
 }
