@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { CheckInRecord, Driver } from '../types'
 import { SessionContext } from './session'
