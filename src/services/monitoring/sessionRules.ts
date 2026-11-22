@@ -13,7 +13,7 @@ export function canAcceptSession(previous: CompetitionSession | null, next: Comp
   if (!isSessionSnapshot(next)) return false
   if (next.contestId !== scope.contestId || next.driverId !== scope.driverId || !Number.isInteger(next.revision) || next.revision < 1) return false
   if (previous && (previous.id !== next.id || next.revision < previous.revision)) return false
-  if (previous && next.revision === previous.revision) return previous.status === next.status && previous.resumeAuthorization?.id === next.resumeAuthorization?.id && previous.latestIncident?.id === next.latestIncident?.id && JSON.stringify(previous.policy) === JSON.stringify(next.policy)
+  if (previous && next.revision === previous.revision) return previous.status === next.status && previous.resumeAuthorization?.id === next.resumeAuthorization?.id && JSON.stringify(previous.policy) === JSON.stringify(next.policy)
   const lockedBefore = previous && ['LOCK_PENDING','LOCKED','UNDER_REVIEW'].includes(previous.status)
   const unlocking = ['ACTIVE','RESUME_AUTHORIZED'].includes(next.status)
   if ((lockedBefore && unlocking) || next.status === 'RESUME_AUTHORIZED') {

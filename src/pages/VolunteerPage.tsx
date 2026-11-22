@@ -30,7 +30,7 @@ export default function VolunteerPage() {
   const [connected, setConnected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [tab, setTab] = useState<'incidents' | 'participants'>('incidents')
+  const [tab, setTab] = useState<'incidents' | 'participants'>('participants')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [review, setReview] = useState<ReviewTarget | null>(null)
   const [note, setNote] = useState('')
@@ -137,6 +137,8 @@ export default function VolunteerPage() {
     if (session.status === 'UNDER_REVIEW') counts.review++
     return counts
   }, { total: 0, racing: 0, flagged: 0, review: 0 })
+
+  const flaggedSessions = sessions.filter(s => ['LOCKED', 'LOCK_PENDING', 'UNDER_REVIEW'].includes(s.status) || (s.latestIncident?.blocking && s.latestIncident.reviewStatus === 'OPEN'))
 
   const deferredSearch = useDeferredValue(search.toLowerCase().trim())
   const rawList = tab === 'incidents' ? incidents : sessions
@@ -272,18 +274,58 @@ export default function VolunteerPage() {
           <ShieldCheck size={42} />
           <h2>{loading ? 'Verifying volunteer access' : 'Volunteer access required'}</h2>
           <p>
-            {isMonitoringMock
+            {viewer?.id
+              ? `You are currently signed in as "${viewer.id}" (${viewer.role} role). Access to the Race Control Dashboard requires an account with VOLUNTEER or ADMIN privileges (e.g. VOLUNTEER2026 or ADMIN2026).`
+              : isMonitoringMock
               ? 'Use a volunteer or admin development account to review mock incidents.'
               : 'An authenticated volunteer or organizer role is required. Contact CPC Club for access.'}
           </p>
           {error && <p role="alert">{error}</p>}
-          <Link to="/" className="text-link"><ArrowLeft size={13} />Race overview</Link>
+          {viewer?.id && (
+            <button
+              type="button"
+              className="arena-quiet-button"
+              onClick={signOut}
+              style={{
+                background: 'linear-gradient(135deg, #dc2626, #991b1b)',
+                color: '#fff',
+                padding: '9px 18px',
+                borderRadius: '5px',
+                fontWeight: 600,
+                fontSize: '12px',
+                marginTop: '10px',
+                cursor: 'pointer',
+                border: '1px solid #ef4444'
+              }}
+            >
+              Sign out & Log in with Volunteer Account
+            </button>
+          )}
+          <Link to="/" className="text-link" style={{ marginTop: '12px' }}><ArrowLeft size={13} />Race overview</Link>
         </div>
       ) : (
         <div className="volunteer-body">
           <aside className="volunteer-sidebar">
             <span className="volunteer-sidebar-label">OPERATIONS</span>
             <div className="volunteer-tabs" role="tablist" aria-label="Race control views">
+              <button
+                id="volunteer-tab-participants"
+                role="tab"
+                aria-selected={tab === 'participants'}
+                aria-controls="volunteer-operations-panel"
+                tabIndex={tab === 'participants' ? 0 : -1}
+                className={tab === 'participants' ? 'selected' : ''}
+                onKeyDown={event => selectTab(event, 'participants')}
+                onClick={() => setTab('participants')}
+              >
+                <Users size={16} />
+                Participants ({sessions.length})
+                {flaggedSessions.length > 0 && (
+                  <span style={{ marginLeft: 'auto', background: '#dc2626', color: '#fff', fontSize: '9px', padding: '1px 5px', borderRadius: '3px', fontWeight: 700 }}>
+                    {flaggedSessions.length} FLAGGED
+                  </span>
+                )}
+              </button>
               <button
                 id="volunteer-tab-incidents"
                 role="tab"
@@ -301,19 +343,6 @@ export default function VolunteerPage() {
                     {incidents.filter(i => i.reviewStatus === 'OPEN' && i.blocking).length}
                   </span>
                 )}
-              </button>
-              <button
-                id="volunteer-tab-participants"
-                role="tab"
-                aria-selected={tab === 'participants'}
-                aria-controls="volunteer-operations-panel"
-                tabIndex={tab === 'participants' ? 0 : -1}
-                className={tab === 'participants' ? 'selected' : ''}
-                onKeyDown={event => selectTab(event, 'participants')}
-                onClick={() => setTab('participants')}
-              >
-                <Users size={16} />
-                Participants ({sessions.length})
               </button>
             </div>
             {viewer.role === 'ADMIN' && (
@@ -388,50 +417,83 @@ export default function VolunteerPage() {
               </button>
             </div>
 
-            {/* Flagged Alert Banner if teams are locked and not currently filtered */}
-            {kpis.flagged > 0 && statusFilter !== 'flagged' && (
+            {/* Dedicated Action Card for Currently Flagged Teams */}
+            {flaggedSessions.length > 0 && (
               <div style={{
-                background: 'linear-gradient(135deg, rgba(225,6,0,0.18), rgba(139,14,33,0.3))',
-                border: '1px solid #e10600',
-                borderRadius: '6px',
-                padding: '12px 18px',
-                marginBottom: '18px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                boxShadow: '0 0 20px rgba(225,6,0,0.2)'
+                background: 'linear-gradient(135deg, rgba(220,38,38,0.22), rgba(127,29,29,0.38))',
+                border: '1px solid #ef4444',
+                borderRadius: '8px',
+                padding: '16px 20px',
+                marginBottom: '20px',
+                boxShadow: '0 4px 24px rgba(220,38,38,0.25)'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <ShieldAlert size={22} style={{ color: '#ff6e7a', flexShrink: 0 }} />
-                  <div>
-                    <strong style={{ color: '#fff', fontSize: '12px', display: 'block' }}>
-                      {kpis.flagged} {kpis.flagged === 1 ? 'Team is' : 'Teams are'} FLAGGED / LOCKED by Race Control
-                    </strong>
-                    <span style={{ fontSize: '10px', color: '#ffccd0' }}>
-                      Action required: Review incidents or authorize resume to allow the participant to continue.
-                    </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <ShieldAlert size={22} style={{ color: '#f87171' }} />
+                    <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.5px' }}>
+                      CURRENTLY FLAGGED / LOCKED TEAMS ({flaggedSessions.length})
+                    </h3>
                   </div>
+                  <span style={{ fontSize: '9px', color: '#fecaca', background: '#991b1b', padding: '3px 8px', borderRadius: '4px', fontWeight: 700, letterSpacing: '0.5px' }}>
+                    ACTION REQUIRED
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('flagged')}
-                  style={{
-                    background: '#e10600',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    padding: '7px 14px',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    letterSpacing: '0.4px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  ISOLATE FLAGGED TEAMS →
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {flaggedSessions.map(fs => (
+                    <div
+                      key={fs.id}
+                      style={{
+                        background: '#141822',
+                        border: '1px solid #374151',
+                        borderRadius: '6px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '16px',
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <strong style={{ color: '#fff', fontSize: '13px' }}>{fs.team || 'CPC Grid'}</strong>
+                          <span style={{ fontFamily: 'Consolas, monospace', fontSize: '11px', color: '#94a3b8' }}>({fs.driverId})</span>
+                          <span style={{ background: '#dc2626', color: '#fff', fontSize: '8px', fontWeight: 700, padding: '2px 6px', borderRadius: '3px' }}>
+                            {fs.status}
+                          </span>
+                        </div>
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#f87171' }}>
+                          {fs.lockReason || fs.latestIncident?.type.replaceAll('_', ' ') || 'Session locked by integrity monitoring'}
+                        </p>
+                        {fs.displayName && fs.displayName !== fs.team && (
+                          <span style={{ fontSize: '10px', color: '#64748b' }}>Member: {fs.displayName}</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        style={{
+                          background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                          color: '#fff',
+                          border: '1px solid #ef4444',
+                          borderRadius: '5px',
+                          padding: '8px 16px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          boxShadow: '0 2px 8px rgba(220,38,38,0.4)',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onClick={() => openSessionUnlock(fs)}
+                        disabled={!connected || busy}
+                      >
+                        <ShieldCheck size={14} /> AUTHORIZE RESUME & UNLOCK
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
