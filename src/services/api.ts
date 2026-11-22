@@ -22,5 +22,9 @@ export const api = axios.create({
 
 api.interceptors.request.use(config => {
   if (!isBackendConfigured) throw new Error('Race services are not connected yet. Contact CPC race control.')
+  const token = typeof window !== 'undefined' ? localStorage.getItem('cgp_auth_token') : null
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })

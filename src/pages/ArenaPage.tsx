@@ -38,7 +38,30 @@ export default function ArenaPage() {
 }
 function ArenaSession({ driverId }: { driverId: string }) {
   const boot = useArenaBoot(driverId)
-  if (boot.error) return <div className="arena-load-screen"><AlertCircle size={34} /><h1>Unable to load the race</h1><p>{boot.error}</p><button className="button button-primary" onClick={boot.retry}>RETRY CONNECTION</button><Link to="/lobby">Return to lobby</Link></div>
+  if (boot.error) {
+    const isAuthError = boot.error.includes('401') || /unauthenticated|authentication required|session expired|invalid.*token/i.test(boot.error)
+    return (
+      <div className="arena-load-screen">
+        <AlertCircle size={34} />
+        <h1>{isAuthError ? 'Authentication Required' : 'Unable to load the race'}</h1>
+        <p>{isAuthError ? 'Your cockpit session credential needs to be refreshed. Please sign in to connect to the race arena.' : boot.error}</p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px' }}>
+          {isAuthError ? (
+            <Link className="button button-primary" to="/login">
+              SIGN IN TO ENTER ARENA
+            </Link>
+          ) : (
+            <button className="button button-primary" onClick={boot.retry}>
+              RETRY CONNECTION
+            </button>
+          )}
+          <Link className="button button-secondary" to="/lobby">
+            Return to lobby
+          </Link>
+        </div>
+      </div>
+    )
+  }
   if (!boot.data) return <div className="arena-load-screen" role="status"><LoaderCircle size={30} className="spin" /><h1>Preparing your cockpit</h1><p>Loading problems, race status and driver progress…</p></div>
   if (!boot.data.session.active || boot.data.session.driverId !== driverId) return <div className="arena-load-screen"><ShieldCheck size={34} /><h1>Your driver session needs attention</h1><p>Sign in again before returning to the arena. Your local drafts are preserved.</p><Link className="button button-primary" to="/check-in">REVIEW DRIVER CHECK-IN</Link></div>
   return <ArenaLoaded initial={boot.data} driverId={driverId} />
