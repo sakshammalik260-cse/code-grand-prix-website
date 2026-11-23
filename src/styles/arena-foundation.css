@@ -13,3 +13,198 @@
 @media(min-width:701px) and (max-width:1200px){.arena-brand{width:200px}}
 
 @media(max-width:1200px){.arena-status-bar .arena-keyboard-hints{display:none}}
+
+/* ==============================================================================
+   COLLAPSIBLE PROBLEM GARAGE PANEL STYLES
+   ============================================================================== */
+
+.arena-sidebar-heading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  position: relative !important;
+  padding-right: 2px !important;
+}
+
+.arena-sidebar-heading-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.arena-collapse-btn {
+  background: transparent;
+  border: 1px solid #323642;
+  color: #9ba1b0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.arena-collapse-btn:hover {
+  background: #242834;
+  color: #ffffff;
+  border-color: #525768;
+}
+
+.arena-collapse-btn.is-expand {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  border-color: #383c4a;
+  background: #171a22;
+}
+
+.arena-collapse-btn.is-expand:hover {
+  background: #232733;
+  border-color: #e10600;
+  color: #ff5555;
+}
+
+.arena-workspace[data-nav-collapsed="true"] .arena-panes {
+  grid-template-columns: 56px minmax(320px, 0.95fr) minmax(440px, 1.55fr) !important;
+  transition: grid-template-columns 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.arena-problem-navigation.is-collapsed {
+  width: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  padding: 8px 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  overflow: hidden !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-sidebar-heading {
+  width: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 4px 0 8px !important;
+  border-bottom: 1px solid #232630 !important;
+  margin-bottom: 6px !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-sidebar-heading-text,
+.arena-problem-navigation.is-collapsed .arena-sidebar-heading > span,
+.arena-problem-navigation.is-collapsed .arena-sidebar-heading > strong {
+  display: none !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-sidebar-track {
+  display: none !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-list {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 2px 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item {
+  width: 44px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  border-radius: 6px !important;
+  background: #141720 !important;
+  border: 1px solid #282b36 !important;
+  gap: 2px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item:hover {
+  background: #202430 !important;
+  border-color: #4a5063 !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item.is-active {
+  background: #2c1215 !important;
+  border-color: #e10600 !important;
+  box-shadow: 0 0 10px rgba(225, 6, 0, 0.4) !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item .arena-problem-name,
+.arena-problem-navigation.is-collapsed .arena-problem-item .arena-problem-status-label {
+  display: none !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item .arena-problem-number {
+  font-family: Bahnschrift, 'Arial Narrow', Consolas, monospace !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #e7e9ef !important;
+  line-height: 1 !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item.is-active .arena-problem-number {
+  color: #ff4d4d !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item .arena-problem-state {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item.is-solved .arena-problem-state {
+  color: #10b981 !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-problem-item.is-attempted .arena-problem-state {
+  color: #f59e0b !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-sidebar-bottom {
+  width: 100% !important;
+  padding: 8px 0 4px !important;
+  border-top: 1px solid #232630 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin-top: auto !important;
+}
+
+.arena-problem-navigation.is-collapsed .arena-sidebar-bottom > div:not(.arena-driver-total-compact),
+.arena-problem-navigation.is-collapsed .arena-sidebar-bottom > dl {
+  display: none !important;
+}
+
+.arena-driver-total-compact {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 4px 2px !important;
+  color: #f59e0b !important;
+  cursor: default !important;
+}
+
+.arena-driver-total-compact .score-val {
+  font-family: Bahnschrift, Consolas, monospace !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+}
