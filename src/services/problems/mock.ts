@@ -1,5 +1,5 @@
 import { authService } from '../auth'
-import { mockProblems } from '../../data/problems'
+import { mockProblems, problemHints } from '../../data/problems'
 import { getMockContest,setMockContest } from '../arena/mockState'
 import { event } from '../../data/event'
 import { ledgerTransaction } from '../monitoring/ledger'
@@ -8,14 +8,30 @@ import { validateProblem, validateRound, validateTestCase } from './validation'
 import type { AdminProblem,AdminProblemService,AdminTestCase,CandidateProblemService,ContestRound,TestCaseInput } from '../../types/problems'
 import type { Problem } from '../../types/arena'
 interface DemoCatalog {questions:AdminProblem[];cases:AdminTestCase[];rounds:ContestRound[]}
-const storageKey='cgp-development-question-catalog-v1'
+const storageKey='cgp-development-question-catalog-v2'
 export function readDemoCatalog():DemoCatalog {
   const raw=localStorage.getItem(storageKey)
-  if(raw){try{return JSON.parse(raw) as DemoCatalog}catch{throw new Error('Demo catalog is unreadable. Ask an organizer to restore it.')}}
+  if(raw){
+    try{
+      const parsed=JSON.parse(raw) as DemoCatalog
+      if(parsed && Array.isArray(parsed.questions) && parsed.questions.length >= 35) return parsed
+    }catch{throw new Error('Demo catalog is unreadable. Ask an organizer to restore it.')}
+  }
   const contest=getMockContest()
-  return {questions:mockProblems.map(problem=>({...problem,allowedLanguages:['python','java','cpp','javascript'],roundId:event.contestId,status:'PUBLISHED',publishAt:null,revision:1,hints:problem.id==='p2'?[{id:'demo-pit-hint-1',order:1,deductionPoints:10,content:'Check the requirement for distinct stops before choosing a strategy.'},{id:'demo-pit-hint-2',order:2,deductionPoints:20,content:'An intermediate total can exceed a 32-bit integer. Choose a suitable numeric type.'}]:[]})),cases:[],rounds:[{id:event.contestId,title:'Round 01',status:contest.status,startsAt:contest.contestStartTime,endsAt:contest.contestEndTime,resultsVisible:false}]}
+  const catalog: DemoCatalog = {
+    questions:mockProblems.map(problem=>({...problem,allowedLanguages:['python','java','cpp','javascript'],roundId:event.contestId,status:'PUBLISHED',publishAt:null,revision:1,hints:problemHints[problem.id]||[]})),
+    cases:[],
+    rounds:[{id:event.contestId,title:'Round 01',status:contest.status,startsAt:contest.contestStartTime,endsAt:contest.contestEndTime,resultsVisible:false}]
+  }
+  write(catalog)
+  return catalog
 }
-function write(data:DemoCatalog){localStorage.setItem(storageKey,JSON.stringify(data))}
+function write(data:DemoCatalog){
+  try {
+    localStorage.removeItem('cgp-development-question-catalog-v1')
+    localStorage.setItem(storageKey,JSON.stringify(data))
+  } catch { /* Memory fallback */ }
+}
 async function requireRole(roles:string[],signal?:AbortSignal){
   if(signal?.aborted)throw new DOMException('Request cancelled','AbortError')
   const user=await authService.me(signal)
