@@ -86,7 +86,9 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
   const progressQueuedSignal = useRef<AbortSignal | undefined>(undefined)
   const fullscreen = useFullscreenStatus()
   const clock = useRaceClock(contest)
-  const selectedId = params.get('problem') || (problems.some(p=>p.id==='p1')?'p1':problems[0]?.id || '')
+  const problemFromParam = params.get('problem')
+  const validParamId = problems.some(p => p.id === problemFromParam) ? problemFromParam : null
+  const selectedId = validParamId || (problems.some(p=>p.id==='p1')?'p1':problems[0]?.id || '')
   const permitted = problems.find(p=>p.id===selectedId)?.allowedLanguages || ['python','java','cpp','javascript'] as LanguageId[]
   const language = isLanguageId(params.get('lang')) ? params.get('lang') as LanguageId : permitted.includes('cpp')?'cpp':permitted[0] || 'cpp'
   const monitoring = useContestMonitoring({ contestId: contest.id, driverId, problemId: selectedId, enabled: clock.effectivePhase === 'LIVE' })

@@ -34,6 +34,6 @@ export const backendAdminProblems:AdminProblemService={
 }
 export const backendCandidateProblems:CandidateProblemService={
   async list(signal){const data=(await api.get<unknown>('/contest/problems',{signal})).data;if(!Array.isArray(data))throw new Error('Invalid contest question list. Contact race control.');return data.map(parseProblemSummary)},
-  async get(id,signal){const problem=parsePublicProblem((await api.get<unknown>(`/contest/problems/${encodeURIComponent(id)}`,{signal})).data);if(problem.id!==id)throw new Error('Question response did not match the selection.');return problem},
+  async get(id,signal){const problem=parsePublicProblem((await api.get<unknown>(`/contest/problems/${encodeURIComponent(id)}`,{signal})).data);if(problem.id!==id&&((problem as unknown as Record<string,unknown>).slug!==id))throw new Error('Question response did not match the selection.');return problem},
   async resultsVisibility(signal){return(await api.get<{visible:boolean}>('/contest/results/visibility',{signal})).data},
 }

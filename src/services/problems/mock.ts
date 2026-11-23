@@ -8,13 +8,13 @@ import { validateProblem, validateRound, validateTestCase } from './validation'
 import type { AdminProblem,AdminProblemService,AdminTestCase,CandidateProblemService,ContestRound,TestCaseInput } from '../../types/problems'
 import type { Problem } from '../../types/arena'
 interface DemoCatalog {questions:AdminProblem[];cases:AdminTestCase[];rounds:ContestRound[]}
-const storageKey='cgp-development-question-catalog-v2'
+const storageKey='cgp-development-question-catalog-v3'
 export function readDemoCatalog():DemoCatalog {
   const raw=localStorage.getItem(storageKey)
   if(raw){
     try{
       const parsed=JSON.parse(raw) as DemoCatalog
-      if(parsed && Array.isArray(parsed.questions) && parsed.questions.length >= 35) return parsed
+      if(parsed && Array.isArray(parsed.questions) && parsed.questions.length >= 35 && parsed.questions.every(q => !['Fastest Route', 'Pit Stop Planning', 'Lap Optimizer', 'Overtake Strategy'].includes(q.title))) return parsed
     }catch{throw new Error('Demo catalog is unreadable. Ask an organizer to restore it.')}
   }
   const contest=getMockContest()
@@ -29,6 +29,7 @@ export function readDemoCatalog():DemoCatalog {
 function write(data:DemoCatalog){
   try {
     localStorage.removeItem('cgp-development-question-catalog-v1')
+    localStorage.removeItem('cgp-development-question-catalog-v2')
     localStorage.setItem(storageKey,JSON.stringify(data))
   } catch { /* Memory fallback */ }
 }
@@ -70,9 +71,8 @@ export const mockAdminProblems:AdminProblemService={
   async saveRound(input){await requireRole(['ADMIN']);assertValid(validateRound(input));const data=readDemoCatalog();data.rounds=[...data.rounds.filter(r=>r.id!==input.id),input];write(data);if(input.id===event.contestId){const previous=getMockContest();setMockContest({...previous,title:previous.title,round:input.title,status:input.status,contestStartTime:input.startsAt,contestEndTime:input.endsAt,pausedAt:input.status==='PAUSED_BY_ORGANIZER'?new Date().toISOString():undefined})};return input},
 }
 export function eligibleQuestions(){
- const contest=getMockContest(),data=readDemoCatalog()
- if(contest.status==='WAITING'||Date.now()<Date.parse(contest.contestStartTime)||!data.rounds.some(r=>r.id===contest.id))return []
- return data.questions.filter(q=>q.roundId===contest.id&&(q.status==='PUBLISHED'||q.status==='SCHEDULED'&&Date.parse(q.publishAt!)<=Date.now()))
+  const data=readDemoCatalog()
+  return data.questions.filter(q=>q.status==='PUBLISHED'||(q.status==='SCHEDULED'&&Number.isFinite(Date.parse(q.publishAt||''))&&Date.parse(q.publishAt!)<=Date.now()))
 }
 export const mockCandidateProblems:CandidateProblemService={
  async list(signal){await requireRole(['CANDIDATE'],signal);return eligibleQuestions().map(q=>({id:q.id,number:q.number,title:q.title,difficulty:q.difficulty,points:q.points,allowedLanguages:q.allowedLanguages}))},
