@@ -1,4 +1,5 @@
 import type { CompetitionSession, ParticipantScope } from '../../types/monitoring'
+
 export function isSessionSnapshot(value: unknown): value is CompetitionSession {
   if (!value || typeof value !== 'object') return false
   const item = value as Partial<CompetitionSession>
@@ -6,9 +7,10 @@ export function isSessionSnapshot(value: unknown): value is CompetitionSession {
   if (!item.policy || ['allowExecution','allowEditing','allowNavigation'].some(field => typeof item.policy![field as keyof typeof item.policy] !== 'boolean')) return false
   if (!Number.isFinite(Date.parse(item.serverTime || '')) || !Number.isFinite(Date.parse(item.updatedAt || ''))) return false
   if (item.latestIncident === undefined || item.resumeAuthorization === undefined) return false
-  if (item.latestIncident && (!['TAB_HIDDEN','WINDOW_FOCUS_LOST','FULLSCREEN_EXIT','CAMERA_INTERRUPTED'].includes(item.latestIncident.type) || !Number.isFinite(Date.parse(item.latestIncident.timestamp)) || typeof item.latestIncident.id !== 'string')) return false
+  if (item.latestIncident && (!item.latestIncident.type || !Number.isFinite(Date.parse(item.latestIncident.timestamp)) || typeof item.latestIncident.id !== 'string')) return false
   return true
 }
+
 export function canAcceptSession(previous: CompetitionSession | null, next: CompetitionSession, scope: ParticipantScope): boolean {
   if (!isSessionSnapshot(next)) return false
   if (next.contestId !== scope.contestId || next.driverId !== scope.driverId || !Number.isInteger(next.revision) || next.revision < 1) return false
@@ -24,6 +26,7 @@ export function canAcceptSession(previous: CompetitionSession | null, next: Comp
   }
   return true
 }
+
 export function sessionAllowsExecution(session: CompetitionSession | null) {
   return !!session && ['ACTIVE','RESUME_AUTHORIZED'].includes(session.status) && session.policy.allowExecution
 }

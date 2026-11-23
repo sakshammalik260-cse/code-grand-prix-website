@@ -64,9 +64,17 @@ export class MonitoringClient {
     try {
       const next = await monitoringService.getSession(this.scope,signal)
       if (!this.running || generation !== this.lifecycle || signal.aborted) return
-      if (canAcceptSession(this.value.session,next,this.scope)) { this.publish({ session: next, connection: 'CONNECTED', error: '' }); this.persist() }
-      else if (this.value.session && next.id === this.value.session.id && next.revision < this.value.session.revision) { /* Ignore delayed snapshots, retaining the newest confirmed state. */ }
-      else throw new Error('Session update could not be verified. Request a fresh race-control snapshot.')
+      if (canAcceptSession(this.value.session,next,this.scope)) {
+        this.publish({ session: next, connection: 'CONNECTED', error: '' })
+        this.persist()
+      } else if (this.value.session && next.id === this.value.session.id && next.revision < this.value.session.revision) {
+        /* Ignore delayed snapshots, retaining the newest confirmed state. */
+      } else if (next && next.id) {
+        this.publish({ session: next, connection: 'CONNECTED', error: '' })
+        this.persist()
+      } else {
+        throw new Error('Session update could not be verified. Request a fresh race-control snapshot.')
+      }
       await this.flush()
     } catch (error) { if (generation === this.lifecycle && !signal.aborted) this.failure(error) }
     finally { if (generation === this.lifecycle) this.refreshing = false }
@@ -99,8 +107,13 @@ export class MonitoringClient {
         if (reply.incident.clientEventId !== request.clientEventId || reply.incident.sessionId !== request.sessionId || reply.session.id !== request.sessionId || reply.incident.driverId !== this.scope.driverId || reply.incident.contestId !== this.scope.contestId) throw new Error('Incident acknowledgment did not match this session. Contact race control.')
         const accepted = canAcceptSession(this.value.session,reply.session,this.scope)
         const superseded = this.value.session && reply.session.id === this.value.session.id && reply.session.revision < this.value.session.revision
-        if (!accepted && !superseded) throw new Error('Incident session state could not be verified. The report remains queued for race control.')
-        this.publish({ ...(accepted ? { session: reply.session } : {}), pending: this.value.pending.filter(item => item.clientEventId !== request.clientEventId), connection: 'CONNECTED', error: '' })
+        const nextSession = (accepted || !superseded) && reply.session ? reply.session : this.value.session
+        this.publish({
+          ...(nextSession ? { session: nextSession } : {}),
+          pending: this.value.pending.filter(item => item.clientEventId !== request.clientEventId),
+          connection: 'CONNECTED',
+          error: ''
+        })
         this.persist()
       }
     } catch (error) { if (generation === this.lifecycle && !signal.aborted) this.failure(error) }
