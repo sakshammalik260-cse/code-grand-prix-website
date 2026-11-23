@@ -115,6 +115,7 @@ export function AdminRaceControlStrip({ onActionTriggered }: { onActionTriggered
       setConfirmAction(null)
       await fetchState()
       onActionTriggered?.()
+      window.dispatchEvent(new CustomEvent('cgp-admin-refresh'))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Race control operation failed.')
     } finally {
@@ -274,6 +275,21 @@ export function AdminRaceControlStrip({ onActionTriggered }: { onActionTriggered
 // ==============================================================================
 export function AdminDashboard() {
   const resource = useRemoteResource(overview)
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      resource.reload()
+    }
+    window.addEventListener('cgp-admin-refresh', handleRefresh)
+    const timer = setInterval(() => {
+      resource.refresh()
+    }, 6000)
+    return () => {
+      window.removeEventListener('cgp-admin-refresh', handleRefresh)
+      clearInterval(timer)
+    }
+  }, [resource])
+
   const compStatus = typeof resource.data?.competitionStatus === 'string'
     ? resource.data.competitionStatus.replaceAll('_', ' ')
     : String(resource.data?.competitionStatus ?? '--')
@@ -306,7 +322,7 @@ export function AdminDashboard() {
         </p>
       )}
 
-      {resource.loading && <p role="status">Loading race overview...</p>}
+      {resource.loading && !resource.data && <p role="status">Loading race overview...</p>}
 
       <div className="admin-kpis">
         {[
@@ -319,7 +335,9 @@ export function AdminDashboard() {
         ].map(([label, value], index) => (
           <div key={label} className={'admin-kpi kpi-' + index}>
             <span>{label}</span>
-            <strong>{typeof value === 'object' && value !== null ? JSON.stringify(value) : (value ?? '--')}</strong>
+            <strong style={label === 'Competition status' ? { color: compStatus === 'LIVE' ? '#22c55e' : compStatus === 'FINISHED' ? '#ef4444' : '#eab308' } : undefined}>
+              {typeof value === 'object' && value !== null ? JSON.stringify(value) : (value ?? '--')}
+            </strong>
             <small>{index < 3 ? 'QUESTION BANK' : 'RACE OPERATIONS'}</small>
           </div>
         ))}
