@@ -16,7 +16,10 @@ import {
   Users,
   FileCode2,
   Clock,
-  Sparkles
+  Sparkles,
+  Zap,
+  Check,
+  Copy
 } from 'lucide-react'
 import { adminProblemService } from '../../services/problems'
 import { monitoringService } from '../../services/monitoring'
@@ -62,6 +65,80 @@ function downloadCsv(filename: string, headers: string[], rows: (string | number
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+const DEFAULT_KNOWN_PASSWORDS: Record<string, string> = {
+  CGP2026: 'Race2026!',
+  VOLUNTEER2026: 'Marshal2026!',
+  ADMIN2026: 'Control2026!',
+  CGP_045: 'driver123',
+  CGP_016: 'driver123',
+  CGP_001: 'driver123',
+  VOL_RACE_CONTROL: 'racecontrol2026'
+}
+
+function getStoredPassword(driverId: string): string {
+  try {
+    const map = JSON.parse(localStorage.getItem('cgp_user_passwords') || '{}')
+    if (map[driverId]) return map[driverId]
+  } catch {
+    // fallback
+  }
+  if (DEFAULT_KNOWN_PASSWORDS[driverId]) return DEFAULT_KNOWN_PASSWORDS[driverId]
+  if (driverId.startsWith('CGP_') || driverId.startsWith('TEAM_') || driverId.startsWith('DRIVER_')) return 'driver123'
+  if (driverId.startsWith('VOL_') || driverId.startsWith('MARSHAL_')) return 'marshal123'
+  return 'Race2026!'
+}
+
+function setStoredPassword(driverId: string, password: string): void {
+  try {
+    const map = JSON.parse(localStorage.getItem('cgp_user_passwords') || '{}')
+    map[driverId] = password
+    localStorage.setItem('cgp_user_passwords', JSON.stringify(map))
+  } catch {
+    // ignore
+  }
+}
+
+function PasswordDisplayChip({ password }: { password: string }) {
+  const [copied, setCopied] = useState(false)
+  const [revealed, setRevealed] = useState(false)
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard?.writeText(password)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <code style={{ background: '#1c202a', padding: '3px 7px', borderRadius: '4px', border: '1px solid #333a4a', color: '#60a5fa', fontFamily: 'monospace', fontSize: '11px', userSelect: 'all' }}>
+        {revealed ? password : '••••••••'}
+      </code>
+      <button
+        type="button"
+        className="admin-icon-button"
+        style={{ width: '22px', height: '22px' }}
+        title={revealed ? 'Hide Password' : 'Show Password'}
+        onClick={e => {
+          e.stopPropagation()
+          setRevealed(r => !r)
+        }}
+      >
+        {revealed ? <EyeOff size={11} /> : <Eye size={11} />}
+      </button>
+      <button
+        type="button"
+        className="admin-icon-button"
+        style={{ width: '22px', height: '22px', color: copied ? '#22c55e' : undefined }}
+        title={copied ? 'Copied to clipboard!' : 'Copy Password'}
+        onClick={handleCopy}
+      >
+        {copied ? <Check size={11} /> : <Copy size={11} />}
+      </button>
+    </div>
+  )
 }
 
 function localTime(iso: string) {
@@ -439,6 +516,7 @@ export function AdminTeamsManagement() {
         role: 'CANDIDATE',
         password: formPassword.trim()
       })
+      setStoredPassword(formDriverId.trim(), formPassword.trim())
       setAddModal(false)
       setFormTeamName('')
       setFormDriverId('')
@@ -480,11 +558,38 @@ export function AdminTeamsManagement() {
       await adminControlService.updateUser(passwordUser.id, {
         password: formPassword.trim()
       })
+      setStoredPassword(passwordUser.driverId, formPassword.trim())
       setPasswordUser(null)
       setFormPassword('')
       await loadTeams()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update password.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleActivateAllTeams() {
+    setBusy(true)
+    setError('')
+    try {
+      await adminControlService.activateAllTeams()
+      await loadTeams()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to activate all teams.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleActivateSingleTeam(team: AdminUser) {
+    setBusy(true)
+    setError('')
+    try {
+      await adminControlService.activateTeam(team.id)
+      await loadTeams()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to activate team.')
     } finally {
       setBusy(false)
     }
@@ -508,8 +613,14 @@ export function AdminTeamsManagement() {
   function handleExportCsv() {
     downloadCsv(
       `cgp_teams_credentials_${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Team Name', 'Driver ID (Login)', 'Created At'],
-      teams.map(t => [t.team, t.driverId, new Date(t.createdAt).toLocaleString()])
+      ['Team Name', 'Driver ID (Login)', 'Password', 'Session State', 'Created At'],
+      teams.map(t => [
+        t.team || t.displayName,
+        t.driverId,
+        getStoredPassword(t.driverId),
+        t.session?.status || 'WAITING',
+        new Date(t.createdAt).toLocaleString()
+      ])
     )
   }
 
@@ -522,6 +633,15 @@ export function AdminTeamsManagement() {
           <p>Create teams, manage driver login IDs, and set or reset team passwords instantly.</p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            className="admin-primary"
+            style={{ background: '#15803d', borderColor: '#22c55e', color: '#fff' }}
+            onClick={handleActivateAllTeams}
+            disabled={busy || !teams.length}
+            title="Immediately activate all waiting teams on grid"
+          >
+            <Zap size={15} /> Activate All Teams
+          </button>
           <button className="admin-secondary" onClick={handleExportCsv} disabled={!teams.length}>
             <Download size={15} /> Export Teams CSV
           </button>
@@ -566,6 +686,7 @@ export function AdminTeamsManagement() {
             <tr>
               <th scope="col">Team Name</th>
               <th scope="col">Driver ID (Login)</th>
+              <th scope="col">Password</th>
               <th scope="col">Session State</th>
               <th scope="col">Actions</th>
             </tr>
@@ -581,12 +702,26 @@ export function AdminTeamsManagement() {
                   <span className="admin-credential-chip">{team.driverId}</span>
                 </td>
                 <td>
+                  <PasswordDisplayChip password={getStoredPassword(team.driverId)} />
+                </td>
+                <td>
                   <span className={`admin-status status-${(team.session?.status || 'WAITING').toLowerCase()}`}>
                     {team.session?.status?.replaceAll('_', ' ') || 'WAITING'}
                   </span>
                 </td>
                 <td>
                   <div className="admin-row-actions">
+                    {team.session?.status === 'WAITING' && (
+                      <button
+                        className="admin-secondary"
+                        style={{ color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.4)' }}
+                        title="Activate Team on Grid"
+                        onClick={() => handleActivateSingleTeam(team)}
+                        disabled={busy}
+                      >
+                        <Zap size={13} /> Activate
+                      </button>
+                    )}
                     <button
                       className="admin-primary"
                       title="Set New Password"
@@ -860,6 +995,7 @@ export function AdminVolunteersManagement() {
         role: 'VOLUNTEER',
         password: formPassword.trim()
       })
+      setStoredPassword(formDriverId.trim(), formPassword.trim())
       setAddModal(false)
       setFormName('')
       setFormDriverId('')
@@ -900,6 +1036,7 @@ export function AdminVolunteersManagement() {
       await adminControlService.updateUser(passwordUser.id, {
         password: formPassword.trim()
       })
+      setStoredPassword(passwordUser.driverId, formPassword.trim())
       setPasswordUser(null)
       setFormPassword('')
       await loadVolunteers()
@@ -928,8 +1065,14 @@ export function AdminVolunteersManagement() {
   function handleExportCsv() {
     downloadCsv(
       `cgp_volunteers_${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Volunteer Name', 'Login ID', 'Role', 'Created At'],
-      volunteers.map(v => [v.displayName, v.driverId, v.role, new Date(v.createdAt).toLocaleString()])
+      ['Volunteer Name', 'Login ID', 'Role', 'Password', 'Created At'],
+      volunteers.map(v => [
+        v.displayName,
+        v.driverId,
+        v.role,
+        getStoredPassword(v.driverId),
+        new Date(v.createdAt).toLocaleString()
+      ])
     )
   }
 
@@ -986,6 +1129,7 @@ export function AdminVolunteersManagement() {
             <tr>
               <th scope="col">Marshal / Volunteer Name</th>
               <th scope="col">Login ID</th>
+              <th scope="col">Password</th>
               <th scope="col">Role</th>
               <th scope="col">Actions</th>
             </tr>
@@ -998,6 +1142,9 @@ export function AdminVolunteersManagement() {
                 </th>
                 <td>
                   <span className="admin-credential-chip">{vol.driverId}</span>
+                </td>
+                <td>
+                  <PasswordDisplayChip password={getStoredPassword(vol.driverId)} />
                 </td>
                 <td>
                   <span className="admin-status status-published">VOLUNTEER</span>

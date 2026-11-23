@@ -43,6 +43,10 @@
   padding: 2px 5px !important;
   border-radius: 3px !important;
   white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  line-height: 1 !important;
 }
 
 .arena-sidebar-heading-left > strong {
@@ -53,6 +57,10 @@
   font-weight: 650 !important;
   text-transform: uppercase !important;
   white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  line-height: 1 !important;
 }
 
 .arena-collapse-garage-btn {

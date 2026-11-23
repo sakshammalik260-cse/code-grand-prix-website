@@ -82,5 +82,13 @@ export const adminControlService = {
 
   async deleteUser(id: string): Promise<{ success: boolean }> {
     return (await api.delete<{ success: boolean }>(`/admin/users/${encodeURIComponent(id)}`)).data
+  },
+
+  async activateAllTeams(): Promise<{ success: boolean; activatedCount: number }> {
+    return (await api.post('/admin/teams/activate-all')).data
+  },
+
+  async activateTeam(id: string): Promise<{ success: boolean; activatedCount: number }> {
+    return (await api.post(`/admin/teams/${encodeURIComponent(id)}/activate`)).data
   }
 }
