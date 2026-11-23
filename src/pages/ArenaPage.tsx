@@ -92,7 +92,7 @@ function ArenaLoaded({ initial, driverId }: { initial: ArenaBootData; driverId: 
   const toggleNavCollapse = useCallback(() => {
     setIsNavCollapsed(prev => {
       const next = !prev
-      try { localStorage.setItem('cgp_problem_garage_collapsed', String(next)) } catch {}
+      try { localStorage.setItem('cgp_problem_garage_collapsed', String(next)) } catch { /* Ignore storage write failures */ }
       return next
     })
   }, [])

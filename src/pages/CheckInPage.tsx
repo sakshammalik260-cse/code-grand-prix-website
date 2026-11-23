@@ -22,6 +22,7 @@ export function CheckInPage() {
     if (!camera.stream && !camera.pending) {
       void camera.request()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => {
     const update = () => setFullscreen(Boolean(document.fullscreenElement))

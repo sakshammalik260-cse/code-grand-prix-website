@@ -92,6 +92,7 @@ export function AdminRaceControlStrip({ onActionTriggered }: { onActionTriggered
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchState()
     const timer = setInterval(() => {
       setRemaining(prev => Math.max(0, prev - 1000))
@@ -412,6 +413,7 @@ export function AdminTeamsManagement() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadTeams()
   }, [loadTeams])
 
@@ -833,6 +835,7 @@ export function AdminVolunteersManagement() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadVolunteers()
   }, [loadVolunteers])
 

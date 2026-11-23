@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "node scripts/verify-questions.mjs && node scripts/verify-assist.mjs && node scripts/verify-drafts.mjs && node scripts/verify-monitoring.mjs",
+    "test": "node scripts/verify-questions.mjs && node scripts/verify-assist.mjs && node scripts/verify-drafts.mjs && node scripts/verify-monitoring.mjs && node scripts/verify-syntax-library.mjs",
     "check": "npm run lint && npm run test && npm run build",
     "preview": "vite preview"
   },

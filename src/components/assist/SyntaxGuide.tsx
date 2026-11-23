@@ -1,11 +1,46 @@
-import { useCallback,useState } from 'react'
-import { BookOpen,Copy,Check } from 'lucide-react'
-import { RaceDialog } from './RaceDialog'
-import { languages,starterCode } from '../../data/starterCode'
+import { useCallback, useState } from 'react'
+import { BookOpen } from 'lucide-react'
 import type { LanguageId } from '../../types/arena'
-export function SyntaxGuide({language,allowed}:{language:LanguageId;allowed:boolean}){
- const [open,setOpen]=useState(false),[selected,setSelected]=useState(language),[feedback,setFeedback]=useState(''),[copied,setCopied]=useState(false)
- const close=useCallback(()=>setOpen(false),[])
- async function copy(){setFeedback('');setCopied(false);try{if(!navigator.clipboard?.writeText)throw new Error('Clipboard is unavailable. Select the boilerplate and copy it manually.');await navigator.clipboard.writeText(starterCode[selected]);setCopied(true);setFeedback('Boilerplate copied. Your editor draft is unchanged.')}catch(error){setFeedback(error instanceof Error?error.message:'Clipboard access failed. Select and copy the boilerplate manually.')}}
- return <><button className="arena-syntax-button" onClick={()=>{setSelected(language);setFeedback('');setCopied(false);setOpen(true)}} disabled={!allowed}><BookOpen size={13}/>SYNTAX GUIDE</button>{open&&allowed&&<RaceDialog titleId="syntax-guide-title" onClose={close} className="syntax-dialog"><span className="assist-eyebrow">COCKPIT REFERENCE / FREE ACCESS</span><h2 id="syntax-guide-title"><BookOpen size={24}/>Syntax Guide</h2><p>Language entry points and basic input/output setup. No algorithms or problem solutions.</p><label className="syntax-language">Reference language<select aria-label="Syntax guide language" value={selected} onChange={e=>{setSelected(e.target.value as LanguageId);setFeedback('');setCopied(false)}}>{languages.map(l=><option value={l.id} key={l.id}>{l.label}</option>)}</select></label><pre tabIndex={0} aria-label="Language boilerplate"><code>{starterCode[selected]}</code></pre><div className="syntax-footer"><span>FREE / NO POINT DEDUCTION</span><button className="assist-primary" onClick={()=>void copy()}>{copied?<Check size={14}/>:<Copy size={14}/>}COPY BOILERPLATE</button></div>{feedback&&<p className={copied?'assist-success':'assist-error'} role="status">{feedback}</p>}<p className="assist-muted">Copy a reference when needed. Your current source and editor language stay unchanged.</p></RaceDialog>}</>
+import { SyntaxLibraryModal } from './SyntaxLibrary/SyntaxLibraryModal'
+
+interface Props {
+  language: LanguageId
+  allowed: boolean
+}
+
+export function SyntaxGuide({ language, allowed }: Props) {
+  const [open, setOpen] = useState(false)
+
+  const handleOpen = useCallback(() => {
+    if (allowed) {
+      setOpen(true)
+    }
+  }, [allowed])
+
+  const handleClose = useCallback(() => {
+    setOpen(false)
+  }, [])
+
+  return (
+    <>
+      <button
+        type="button"
+        className="arena-syntax-button"
+        onClick={handleOpen}
+        disabled={!allowed}
+        aria-label="Open Syntax Library Reference"
+        title="Open Syntax Reference (Free / Zero Penalty)"
+      >
+        <BookOpen size={13} />
+        <span>SYNTAX GUIDE</span>
+      </button>
+
+      {open && allowed && (
+        <SyntaxLibraryModal
+          initialLanguage={language}
+          onClose={handleClose}
+        />
+      )}
+    </>
+  )
 }

@@ -17,11 +17,14 @@ export function useArenaExecution({ request, allowed, simulation, onBusyChange, 
   const [history, setHistory] = useState<SubmissionResult[]>(()=>readHistory(historyKey,request,simulation))
   const [error, setError] = useState('')
   const controller = useRef<AbortController | null>(null)
+  const progressController = useRef<AbortController | null>(null)
   const locked = useRef(false)
   const mounted = useRef(false)
   useEffect(() => {
     mounted.current = true
-    return () => { mounted.current = false; controller.current?.abort(); onBusyChange(false) }
+    const progress = new AbortController()
+    progressController.current = progress
+    return () => { mounted.current = false; controller.current?.abort(); progress.abort(); onBusyChange(false) }
   }, [onBusyChange])
   const remember = useCallback((value: SubmissionResult) => {
     setSubmission(value)
@@ -35,8 +38,7 @@ export function useArenaExecution({ request, allowed, simulation, onBusyChange, 
       if (!signal.aborted) remember(value)
     }
     if (value.status === 'QUEUED' || value.status === 'RUNNING') throw new Error('Your submission is queued, but the result is delayed. Use “Check result” to retrieve it without submitting again.')
-    await onProgress(signal)
-  }, [remember, onProgress])
+  }, [remember])
   const execute = useCallback(async (kind: 'run' | 'submit', existing?: SubmissionResult) => {
     if (locked.current) return
     if (!existing && !request.sourceCode.trim()) { setError('Your editor is empty. Add source code before running or submitting.'); return }
@@ -45,11 +47,17 @@ export function useArenaExecution({ request, allowed, simulation, onBusyChange, 
     const nextController = new AbortController()
     controller.current = nextController
     const signal = nextController.signal
+    const progressSignal = progressController.current?.signal
+    const refreshProgress = () => {
+      if (!signal.aborted && progressSignal && !progressSignal.aborted) {
+        void onProgress(progressSignal).catch(() => { /* Progress errors are handled by the arena. */ })
+      }
+    }
     setOperation(kind); setLastAction(kind); setError(''); onBusyChange(true)
     try {
       if (kind === 'run') {
         setRunResult(null)
-        const result = await arenaServices.runCode({ ...request }, signal)
+        const result = await arenaServices.runCode(request, signal)
         if (!signal.aborted) setRunResult(result)
       } else {
         let value = existing
@@ -59,9 +67,10 @@ export function useArenaExecution({ request, allowed, simulation, onBusyChange, 
           value = await arenaServices.submitCode(payload, signal)
           if (signal.aborted) return
           setSubmitting(false); remember(value)
-          await onProgress(signal)
+          if (value.status === 'QUEUED' || value.status === 'RUNNING') refreshProgress()
         }
         await poll(value, signal)
+        refreshProgress()
       }
     } catch (reason) {
       if (!signal.aborted && !isAbort(reason)) setError(errorMessage(reason))
